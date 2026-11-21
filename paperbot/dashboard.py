@@ -8,7 +8,7 @@ import pandas as pd
 
 from .engine import CANDLE, indicators, mark_to_market
 
-COLORS = {"v2_main": "#2563eb", "v1_old": "#d97706", "longs_only": "#7c3aed"}
+COLORS = {"v3_main": "#2563eb", "v3_no_rotation": "#d97706", "v2_main": "#7c3aed"}
 BREAKEVEN_WR = 1 / (1 + 1.5)  # 1.5R long target -> 40% win rate breaks even (shorts use 1R -> 50%)
 BACKTEST = {"win_rate": 0.40, "avg_R": 0.10, "per_year": 120}
 
@@ -146,7 +146,7 @@ def pl(x: float) -> str:
     return f'<span class="{cls}">{"+" if x > 0 else ""}{fmt_money(x) if not isinstance(x, str) else x}</span>'
 
 
-def build(states: dict, variants, raw: dict, btc: pd.DataFrame, pairs: list, now: pd.Timestamp) -> str:
+def build(states: dict, variants, raw: dict, btc: pd.DataFrame, pairs: list, now: pd.Timestamp, reg=None) -> str:
     S = {v.name: stats(states[v.name], v.start_cap) for v in variants}
     # market regime
     mk_rows, ups, downs = [], 0, 0
@@ -169,6 +169,9 @@ def build(states: dict, variants, raw: dict, btc: pd.DataFrame, pairs: list, now
     regime = ("Uptrend: bot looks for long breakouts" if btc_up and ups >= downs else
               "Downtrend: bot looks for short breakdowns" if (btc_up is False and downs >= ups) else
               "Mixed: coins and BTC disagree, fewer signals")
+    if reg is not None and not reg.empty and int(reg["phase"].iloc[-1]) in (3, 4):
+        regime = {3: "Alt season (late): v3 skips alt longs, still takes shorts if they set up",
+                  4: "Downtrend, money hiding in gold: v3 waits (no new shorts) — the comparison versions still trade"}[int(reg["phase"].iloc[-1])]
     nxt = (now.floor("4h") + CANDLE + pd.Timedelta(minutes=7))
 
     cards = []
@@ -247,18 +250,21 @@ table{{border-collapse:collapse;width:100%;font-size:13px}} th,td{{padding:8px 1
 .legend{{margin-bottom:6px}} .key{{margin-right:14px;font-size:13px}} .key i{{display:inline-block;width:12px;height:3px;margin-right:6px;vertical-align:middle}}
 .dgs{{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}} .dg{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 16px}}
 .dg ul{{padding-left:18px}} .dg li{{margin:6px 0}} li.good::marker{{color:var(--pos)}} li.bad::marker{{color:var(--neg)}} li.warn::marker{{color:#d97706}} li.info::marker{{color:var(--mut)}}
+.cd{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:8px 0}} .cd summary{{cursor:pointer}} .cd .chart{{border:0;margin-top:8px}} a{{color:#2563eb}}
 footer{{margin-top:36px;color:var(--mut);font-size:13px}}
 </style></head><body><main>
 <h1>Crypto paper-trading bot</h1>
-<div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100 · v2_main is the strategy, the other two are for comparison</div>
+<div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100 · v3_main is the strategy, the other two are for comparison</div>
 <div class="banner">
   <div><span>Last update</span><b>{chi(now)}</b></div>
   <div><span>Next update</span><b>~{chi(nxt)}</b></div>
   <div><span>Running since</span><b>{chi(started)}</b></div>
   <div><span>Market</span><b>{esc(regime)}</b> <span class="small">{ups} of {ups + downs} coins above 50-day avg · BTC {'above' if btc_up else 'below'}</span></div>
 </div>
+{rotation_section(reg, now)}
 <h2>Scoreboard</h2><div class="cards">{''.join(cards)}</div>
 <h2>Equity over time</h2>{svg_equity(states, variants)}
+<h2>Charts</h2>{charts_section(states, variants, raw, btc, pairs, now)}
 <h2>Open trades</h2>{table(["Version","Coin","Side","Opened","Entry","Stop","Target","Now","P/L","R now","Margin"], open_rows, "No open trades right now.")}
 <h2>Where it's lagging &amp; what to improve</h2>
 <p class="muted small">Automatic checks against the backtest. R = profit measured in units of the amount risked (−1R = a normal stop-out, +1.5R = a normal win).</p>
@@ -268,11 +274,128 @@ footer{{margin-top:36px;color:var(--mut);font-size:13px}}
 {table(["Version","Coin","Side","Opened","Closed","Entry","Exit","P/L","R","Best / worst","Exit"], closed_rows, "No closed trades yet.")}
 <h2>Breakdown</h2>{''.join(breakdown) or '<p class="muted">Appears after the first closed trade.</p>'}
 <h2>Market check (last closed 4H candle)</h2>
-<p class="muted small">Signals shown for v2_main. Long: coin and BTC above their 50-day avg, close above the 20-day high.
+<p class="muted small">Signals shown for v3_main (rotation rules included). Long: coin and BTC above their 50-day avg, close above the 20-day high.
 Short: coin and BTC below their 50-day avg, close below the 20-day low, EMA20 below EMA50, RSI between 20 and 50, and price not more than 3 ATR below EMA20.</p>
 {table(["Coin","vs 50-day avg","Price","To 20-day high","To 20-day low","Signal"], mk_rows)}
-<footer>Rules (v2_main): 20-day breakout/breakdown in the direction of the 50-day trend (coin and BTC); shorts also need EMA20 &lt; EMA50, RSI 20-50 and price not overstretched;
+<footer>Rules (v3_main): longs and shorts below, plus market rotation (no alt longs in alt season, no shorts in gold risk-off). 20-day breakout/breakdown in the direction of the 50-day trend (coin and BTC); shorts also need EMA20 &lt; EMA50, RSI 20-50 and price not overstretched;
 stop 2.5× ATR; take profit at 1.5× the stop distance for longs, 1× for shorts;
 exit if price closes back across the 50-day average; 1% risk per trade, max 3 open; 12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
 Not modelled: funding fees and the funding-rate filter of the real futures bot. Times in Chicago time.</footer>
 </main></body></html>"""
+
+
+def svg_candles(f: pd.DataFrame, pair: str, st: dict, n: int = 120, w: int = 1000, h: int = 340) -> str:
+    """Candlestick chart of the last n closed 4H candles with averages, breakout levels and the main version's trades."""
+    d = f.tail(n)
+    if len(d) < 10:
+        return ""
+    pad_l, pad_r, pad_t, pad_b = 8, 62, 10, 22
+    t0, t1 = d.index[0], d.index[-1]
+    span = (t1 - t0).total_seconds() or 1
+    trades_open = [t for p, t in st["open"].items() if p == pair]
+    trades_closed = [c for c in st["closed"] if c["pair"] == pair and pd.Timestamp(c["closed"]) >= t0]
+    levels = [x for t in trades_open for x in (t["stop"], t["target"], t["entry"])]
+    cols = [c for c in ("sma300", "ema20", "hh120", "ll120") if c in d]
+    lo = min(d["low"].min(), *(d[c].min() for c in cols), *levels) if levels else min(d["low"].min(), *(d[c].min() for c in cols))
+    hi = max(d["high"].max(), *(d[c].max() for c in cols), *levels) if levels else max(d["high"].max(), *(d[c].max() for c in cols))
+    lo, hi = lo * 0.995, hi * 1.005
+    cw = (w - pad_l - pad_r) / len(d)
+    X = lambda t: pad_l + (pd.Timestamp(t) - t0).total_seconds() / span * (w - pad_l - pad_r - cw) + cw / 2
+    Y = lambda v: pad_t + (1 - (v - lo) / (hi - lo)) * (h - pad_t - pad_b)
+    g = [f'<svg viewBox="0 0 {w} {h}" class="chart" role="img" aria-label="{esc(pair)} 4H chart">']
+    for k in range(5):
+        v = lo + (hi - lo) * k / 4
+        g.append(f'<line x1="{pad_l}" y1="{Y(v):.1f}" x2="{w - pad_r}" y2="{Y(v):.1f}" class="grid"/>'
+                 f'<text x="{w - pad_r + 4}" y="{Y(v) + 4:.1f}" class="axis">{v:.4g}</text>')
+    for frac in (0, 0.5, 1):
+        t = t0 + (t1 - t0) * frac
+        g.append(f'<text x="{X(t):.1f}" y="{h - 6}" class="axis" text-anchor="middle">{t.tz_convert("America/Chicago"):%b %d}</text>')
+    for t, r in d.iterrows():
+        up = r["close"] >= r["open"]
+        col = "var(--pos)" if up else "var(--neg)"
+        x = X(t)
+        yb, yt = Y(max(r["open"], r["close"])), Y(min(r["open"], r["close"]))
+        g.append(f'<line x1="{x:.1f}" y1="{Y(r["high"]):.1f}" x2="{x:.1f}" y2="{Y(r["low"]):.1f}" stroke="{col}"/>'
+                 f'<rect x="{x - cw * 0.35:.1f}" y="{yb:.1f}" width="{cw * 0.7:.1f}" height="{max(yt - yb, 0.8):.1f}" fill="{col}"/>')
+    styles = {"sma300": ("#6b7280", ""), "ema20": ("#d97706", ""), "hh120": ("#2563eb", "3 3"), "ll120": ("#2563eb", "3 3")}
+    for c in cols:
+        s = d[c].dropna()
+        pts = " ".join(f"{X(t):.1f},{Y(v):.1f}" for t, v in s.items())
+        col, dash = styles[c]
+        g.append(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="1.3" stroke-dasharray="{dash}"/>')
+    for t in trades_open:
+        xs = X(max(pd.Timestamp(t["opened"]), t0))
+        for val, col, lab in ((t["target"], "var(--pos)", "target"), (t["entry"], "#2563eb", "entry"), (t["stop"], "var(--neg)", "stop")):
+            g.append(f'<line x1="{xs:.1f}" y1="{Y(val):.1f}" x2="{w - pad_r}" y2="{Y(val):.1f}" stroke="{col}" stroke-width="1.5" stroke-dasharray="6 3"/>'
+                     f'<text x="{w - pad_r - 4}" y="{Y(val) + (12 if lab == "target" and t["side"] == -1 or lab == "stop" and t["side"] == 1 else -4):.1f}" '
+                     f'class="axis" text-anchor="end" style="fill:{col};font-weight:600">{lab} {val:.4g}</text>')
+    for c in trades_closed + [dict(t, side="long" if t["side"] == 1 else "short") for t in trades_open]:
+        ot = pd.Timestamp(c["opened"])
+        if ot >= t0:
+            x, y = X(ot), Y(c["entry"])
+            tri = (f"{x:.1f},{y + 9:.1f} {x - 6:.1f},{y + 19:.1f} {x + 6:.1f},{y + 19:.1f}" if c["side"] == "long"
+                   else f"{x:.1f},{y - 9:.1f} {x - 6:.1f},{y - 19:.1f} {x + 6:.1f},{y - 19:.1f}")
+            g.append(f'<polygon points="{tri}" fill="#2563eb"><title>{c["side"]} entry {c["entry"]:.5g}</title></polygon>')
+        if "exit" in c:
+            x, y = X(min(pd.Timestamp(c["closed"]) - CANDLE, t1)), Y(c["exit"])
+            col = "var(--pos)" if c["pnl"] > 0 else "var(--neg)"
+            g.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="5" fill="{col}" stroke="var(--card)" stroke-width="1.5">'
+                     f'<title>exit {c["exit"]:.5g} ({c["reason"].replace("_", " ")}) {c["pnl"]:+.2f} USD</title></circle>')
+    g.append("</svg>")
+    return "".join(g)
+
+
+def charts_section(states: dict, variants, raw: dict, btc: pd.DataFrame, pairs: list, now: pd.Timestamp) -> str:
+    main = variants[0]
+    st = states[main.name]
+    order = sorted(pairs, key=lambda p: (p not in st["open"], p))
+    out = []
+    for p in order:
+        f = indicators(raw[p], btc, main)
+        f = f[f.index + CANDLE <= now]
+        svg = svg_candles(f, p, st)
+        if not svg:
+            continue
+        tv = f"https://www.tradingview.com/chart/?symbol=BINANCE:{p}USDT.P&interval=240"
+        tag = ""
+        if p in st["open"]:
+            t = st["open"][p]
+            tag = f' <span class="tag ok">{"LONG" if t["side"] == 1 else "SHORT"} open</span>'
+        out.append(f'<details {"open" if p in st["open"] else ""} class="cd"><summary><b>{esc(p)}</b>{tag}'
+                   f' <span class="muted small">last 20 days, 4H</span></summary>{svg}'
+                   f'<div class="small"><a href="{tv}" target="_blank" rel="noopener">Open live {esc(p)} chart on TradingView ↗</a></div></details>')
+    legend = ('<p class="muted small">Grey = 50-day average (trend) · orange = EMA20 · blue dotted = 20-day high / low (breakout levels) · '
+              '▲ long entry, ▼ short entry · dots = exits (green profit, red loss) · dashed lines = open trade entry / stop / target. '
+              f'Trades shown are {esc(main.name)}. Coins with an open trade are listed first and expanded.</p>')
+    return legend + "".join(out)
+
+
+PHASE_INFO = {
+    1: ("BTC season", "#f59e0b", "BTC leads, alts lag. Historically the BEST time for alt breakout longs: the money has not rotated yet."),
+    2: ("ETH / large caps", "#3b82f6", "Money moving from BTC into ETH and large caps. Alt longs work well; alt season often comes next."),
+    3: ("Alt season", "#10b981", "Alts already outperforming BTC. Late stage: alt breakouts here lost money in the backtest, so v3 takes no alt longs."),
+    4: ("Risk-off (gold > BTC)", "#6b7280", "BTC in a downtrend and gold beating BTC: money is hiding. Shorts here were break-even, so v3 does not short."),
+    5: ("Crypto down, gold not bid", "#ef4444", "BTC downtrend without a flight to gold: active selling. Historically the best time for shorts."),
+}
+
+
+def rotation_section(reg, now) -> str:
+    if reg is None or reg.empty:
+        return ""
+    r = reg.dropna(subset=["phase"])
+    cur = int(r["phase"].iloc[-1])
+    if cur == 0:
+        return ""
+    name, col, txt = PHASE_INFO[cur]
+    d = r.set_index("date")["phase"].resample("1D").last().dropna().tail(120)
+    w, h = 1000, 26
+    bw = w / max(len(d), 1)
+    bars = "".join(f'<rect x="{i * bw:.1f}" y="0" width="{bw + 0.5:.1f}" height="{h}" fill="{PHASE_INFO.get(int(v), ("", "#e5e7eb", ""))[1]}">'
+                   f'<title>{t:%b %d}: {PHASE_INFO.get(int(v), ("n/a",))[0]}</title></rect>' for i, (t, v) in enumerate(d.items()))
+    strip = f'<svg viewBox="0 0 {w} {h}" style="width:100%;height:26px;border-radius:6px">{bars}</svg>'
+    keys = " ".join(f'<span class="key"><i style="background:{c};height:10px"></i>{n}</span>' for n, c, _ in PHASE_INFO.values())
+    return f"""<h2>Market rotation</h2>
+<div class="card"><div class="ch"><b>Now: <span style="color:{col}">{esc(name)}</span></b><span class="muted small">90-day view of BTC vs alts, ETH/BTC and gold/BTC</span></div>
+<p style="margin:6px 0 10px">{esc(txt)}</p>{strip}
+<div class="muted small" style="display:flex;justify-content:space-between"><span>{d.index[0]:%b %d}</span><span>last 120 days</span><span>{d.index[-1]:%b %d}</span></div>
+<div class="legend" style="margin-top:6px">{keys}</div></div>"""

@@ -64,6 +64,12 @@ class Variant:
     s_atr_stop: float = 0.0         # short stop ATR multiple (0 = same as longs)
     s_rsi_lo: float = 30.0          # RSI band used by s_ema_rsi
     s_rsi_hi: float = 50.0
+    rs_len: int = 0                 # relative strength vs BTC: longs need coin/BTC ratio above its N-candle avg,
+                                    # shorts need it below (0 = off)
+    shock_k: float = 0.0            # news/whale-shock guard: no new entries if the coin or BTC printed a candle with
+    shock_n: int = 3                #   range > shock_k x ATR within the last shock_n candles (0 = off)
+    rot_no_alt_season_longs: bool = False   # rotation: no alt longs once alt season is already running (late)
+    rot_no_gold_shorts: bool = False        # rotation: no shorts while money is hiding in gold (selling mostly done)
     s_buyzone: bool = False         # skip breakdown if 15m shows buyers stepping in during the candle's last hour
 
 
@@ -84,10 +90,29 @@ def indicators(df: pd.DataFrame, btc: pd.DataFrame, v) -> pd.DataFrame:
     b["btc_up"] = (b["close"] > bsma).astype(int)
     b["btc_down"] = (b["close"] < bsma).astype(int)
     b["btc_falling"] = (bsma < bsma.shift(30)).astype(int)
-    df = df.merge(b[["date", "btc_up", "btc_down", "btc_falling"]], on="date", how="left")
+    b["btc_close"] = b["close"]
+    batr = ta.ATR(btc, timeperiod=14)
+    b["btc_shock"] = ((btc["high"] - btc["low"]) > (v.shock_k or 99) * batr.shift(1)).astype(int)
+    df = df.merge(b[["date", "btc_up", "btc_down", "btc_falling", "btc_close", "btc_shock"]], on="date", how="left")
     df[["btc_up", "btc_down", "btc_falling"]] = df[["btc_up", "btc_down", "btc_falling"]].fillna(0)
     vol_ok = (df["volume"] > df["vol_avg"] * v.vol_mult) if v.vol_mult > 0 else (df["volume"] > 0)
-    df["enter_long"] = (v.longs & (df["close"] > df["sma300"]) & (df["btc_up"] == 1) & (df["close"] > df["hh120"]) & vol_ok).fillna(False)
+    calm = pd.Series(True, index=df.index)
+    if v.shock_k > 0:
+        coin_shock = (df["high"] - df["low"]) > v.shock_k * df["atr"].shift(1)
+        any_shock = (coin_shock | (df["btc_shock"] == 1)).astype(int).rolling(v.shock_n, min_periods=1).max() == 1
+        calm = ~any_shock
+    rs_up = rs_dn = pd.Series(True, index=df.index)
+    if v.rs_len > 0:
+        ratio = df["close"] / df["btc_close"]
+        rs_up, rs_dn = ratio > ratio.rolling(v.rs_len).mean(), ratio < ratio.rolling(v.rs_len).mean()
+    if "phase" in df:
+        ph = df["phase"].fillna(0)
+        if v.rot_no_alt_season_longs:
+            rs_up = rs_up & (ph != 3)
+        if v.rot_no_gold_shorts:
+            rs_dn = rs_dn & (ph != 4)
+    df["enter_long"] = (v.longs & (df["close"] > df["sma300"]) & (df["btc_up"] == 1) & (df["close"] > df["hh120"])
+                        & vol_ok & calm & rs_up).fillna(False)
 
     rng = (df["high"] - df["low"]).replace(0, np.nan)
     down = (df["close"] < df["sma300"]) & (df["btc_down"] == 1)
@@ -112,7 +137,7 @@ def indicators(df: pd.DataFrame, btc: pd.DataFrame, v) -> pd.DataFrame:
     bounce = ((df["high"] >= df["ema20"]) & (df["close"] < df["ema20"]) & (df["close"] < df["open"])
               & (df["ema20"] < df["ema50"]) & (df["rsi"] < 55))
     sig = brk if v.short_mode == "breakdown" else bounce if v.short_mode == "bounce" else (brk | bounce)
-    df["enter_short"] = (down & sig).fillna(False) if v.shorts else False
+    df["enter_short"] = (down & sig & calm & rs_dn).fillna(False) if v.shorts else False
     return df.set_index("date")
 
 

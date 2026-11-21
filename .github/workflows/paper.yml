@@ -26,6 +26,9 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Advance paper ledgers and build dashboard
+        env:   # optional Telegram alerts: add these two repo secrets to switch them on
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python -m paperbot.run_live
       - name: Save state and dashboard
         run: |
