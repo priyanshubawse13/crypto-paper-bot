@@ -255,6 +255,7 @@ footer{{margin-top:36px;color:var(--mut);font-size:13px}}
 </style></head><body><main>
 <h1>Crypto paper-trading bot</h1>
 <div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100 · v3_main is the strategy, the other two are for comparison</div>
+<div class="banner" style="justify-content:space-between"><div><span>Exchange replay</span><b><a href="replay/">Watch the bot trade 2022 → today on real 1-minute futures data, with fees, funding &amp; liquidation ↗</a></b></div></div>
 <div class="banner">
   <div><span>Last update</span><b>{chi(now)}</b></div>
   <div><span>Next update</span><b>~{chi(nxt)}</b></div>

@@ -1,0 +1,165 @@
+"""Writes the self-contained replay viewer (index.html) next to replay.json."""
+from pathlib import Path
+
+HTML = r"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exchange replay — crypto bot</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#111827;--mut:#6b7280;--line:#e5e7eb;--pos:#059669;--neg:#dc2626;--acc:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#0b0f14;--card:#121821;--ink:#e5e7eb;--mut:#9ca3af;--line:#243041;--pos:#34d399;--neg:#f87171;--acc:#60a5fa}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+main{max-width:1280px;margin:0 auto;padding:16px}h1{font-size:22px;margin:0}h2{font-size:16px;margin:22px 0 8px}
+.mut{color:var(--mut)}.small{font-size:12px}.pos{color:var(--pos)}.neg{color:var(--neg)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}.card span{display:block;color:var(--mut);font-size:12px}.card b{font-size:18px}
+.player{display:grid;grid-template-columns:1fr 330px;gap:12px;margin-top:14px}@media(max-width:900px){.player{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px}
+canvas{width:100%;display:block}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+button,select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;cursor:pointer}
+button.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+input[type=range]{width:100%}
+.log{max-height:430px;overflow:auto;font-size:12px}.log div{padding:5px 0;border-bottom:1px solid var(--line)}
+.pos-row{padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:12px}td,th{padding:5px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--mut)}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+.badge{font-size:11px;padding:1px 6px;border-radius:999px;background:var(--line)}
+</style></head><body><main>
+<h1>Exchange replay</h1>
+<div class="mut" id="sub">Loading…</div>
+<div class="cards" id="cards"></div>
+<div class="player">
+  <div class="panel">
+    <div class="ctl">
+      <select id="coin"></select>
+      <button id="rew" title="Back to start">⏮</button>
+      <button id="play" class="primary">▶ Play</button>
+      <button id="next" title="Jump to the next entry or exit on any coin">⏭ Next trade</button>
+      <select id="speed"><option value="2">2 candles/s</option><option value="8" selected>8 candles/s</option><option value="30">30 candles/s</option><option value="120">120 candles/s</option></select>
+      <label class="small"><input type="checkbox" id="ff" checked> fast-forward when flat</label>
+      <span id="clock" class="small mut"></span>
+    </div>
+    <canvas id="chart" height="420"></canvas>
+    <input type="range" id="scrub" min="0" max="1" value="0">
+    <canvas id="eq" height="110"></canvas>
+    <div class="small mut">Blue ▲/▼ = entry (long/short) · dot = exit (green profit / red loss) · dashed = open trade entry / stop / target · grey = 50-day average. Equity below; the line marks the replay time.</div>
+  </div>
+  <div class="panel">
+    <b>Account at replay time</b>
+    <div id="acct" class="small" style="margin:6px 0 10px"></div>
+    <b>Open positions</b><div id="open" style="margin-bottom:10px"></div>
+    <b>Trade log</b><div class="log" id="log"></div>
+  </div>
+</div>
+<h2>All trades</h2><div class="tw"><table id="tbl"></table></div>
+<h2>Costs, the real-exchange stuff</h2><div class="tw"><table id="costs"></table></div>
+<p class="small mut">Simulated Binance USDⓈ-M futures on real 1-minute history: market orders fill at the next minute's open with spread + size slippage;
+stops are real STOP_MARKET orders on last price; fees 0.02% maker / 0.05% taker + 18% GST; real 8-hourly funding; isolated margin
+with mark-price liquidation. Not simulated: order-book queue, partial fills, ADL, outages. Paper money only.</p>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const H4=4*3600e3;
+let R, coin, idx=0, playing=false, timer=null, T=[], tmin, tmax;
+const fmt=(x,d=2)=>(x<0?"-":"")+"$"+Math.abs(x).toFixed(d);
+const fp=x=>{const a=Math.abs(x);return a>=100?x.toFixed(2):a>=1?x.toFixed(4):x.toPrecision(5)};
+const dt=t=>new Date(t).toLocaleString([], {month:"short",day:"numeric",year:"numeric",hour:"2-digit",minute:"2-digit"});
+fetch("replay.json").then(r=>r.json()).then(init);
+function init(r){
+  R=r; const s=r.summary;
+  $("sub").textContent=`${s.variant} · ${s.start} → ${s.end.slice(0,10)} · start $${s.start_balance} · rotation ${s.rotation} · ran in ${s.runtime_s}s`;
+  const ret=(s.final_equity/s.start_balance-1)*100;
+  const cards=[["Final equity",fmt(s.final_equity),ret>=0?"pos":"neg"],["Return",ret.toFixed(1)+"%",ret>=0?"pos":"neg"],["Trades",s.trades],
+    ["Win rate",s.win_rate==null?"—":(s.win_rate*100).toFixed(0)+"%"],["Profit factor",s.profit_factor??"—"],["Worst drop",s.max_drawdown_pct+"%"],
+    ["Fees + GST",fmt(s.fees+s.gst_on_fees)],["Funding (net)",fmt(s.funding_net),s.funding_net>=0?"pos":"neg"],["Slippage",fmt(s.slippage_cost)],
+    ["Liquidations",s.liquidations,s.liquidations?"neg":""]];
+  $("cards").innerHTML=cards.map(c=>`<div class="card"><span>${c[0]}</span><b class="${c[2]||""}">${c[1]}</b></div>`).join("");
+  const coins=Object.keys(r.candles); coin=coins[0];
+  $("coin").innerHTML=coins.map(c=>`<option>${c}</option>`).join("");
+  T=r.equity.map(e=>e[0]); tmin=T[0]; tmax=T[T.length-1];
+  $("scrub").max=T.length-1;
+  r.trades.forEach(t=>t.R=t.R??null);
+  // trades table
+  $("tbl").innerHTML="<tr><th>Coin</th><th>Side</th><th>Opened</th><th>Closed</th><th>Entry</th><th>Exit</th><th>Net P/L</th><th>Fees</th><th>Funding</th><th>Exit reason</th></tr>"+
+    r.trades.slice().reverse().map(t=>`<tr><td><b>${t.symbol}</b></td><td>${t.side}</td><td>${dt(t.opened)}</td><td>${dt(t.closed)}</td><td>${fp(t.entry)}</td><td>${fp(t.exit)}</td>
+    <td class="${t.net>0?"pos":"neg"}">${fmt(t.net)}</td><td>${fmt(t.fees,3)}</td><td>${fmt(t.funding,3)}</td><td>${t.reason.replace("_"," ")}</td></tr>`).join("");
+  const by=s.by_reason, rows=Object.entries(by).map(([k,v])=>`<tr><td>${k.replace("_"," ")}</td><td>${v.size}</td><td class="${v.sum>0?"pos":"neg"}">${fmt(v.sum)}</td></tr>`).join("");
+  $("costs").innerHTML=`<tr><th>Item</th><th>Count</th><th>Total</th></tr>${rows}
+    <tr><td>Trading fees</td><td>${s.trades*2}</td><td class="neg">${fmt(-s.fees)}</td></tr><tr><td>GST on fees (18%)</td><td></td><td class="neg">${fmt(-s.gst_on_fees)}</td></tr>
+    <tr><td>Funding payments (net)</td><td>${r.funding.length}+</td><td class="${s.funding_net>=0?"pos":"neg"}">${fmt(s.funding_net)}</td></tr>
+    <tr><td>Slippage (spread + size)</td><td></td><td class="neg">${fmt(-s.slippage_cost)}</td></tr>
+    <tr><td>Orders rejected by exchange rules</td><td>${s.rejected_orders}</td><td></td></tr><tr><td>Signals skipped (below $5 minimum)</td><td>${s.skipped_min_size}</td><td></td></tr>
+    <tr><td>Liquidations</td><td>${s.liquidations}</td><td></td></tr>`;
+  // start at first trade
+  const first=r.trades.length?r.trades.reduce((a,b)=>a.opened<b.opened?a:b):null;
+  if(first){coin=first.symbol;$("coin").value=coin;idx=Math.max(0,T.findIndex(t=>t>=first.opened)-30);}
+  $("coin").onchange=e=>{coin=e.target.value;draw()};
+  $("scrub").oninput=e=>{idx=+e.target.value;draw()};
+  $("play").onclick=toggle; $("rew").onclick=()=>{idx=0;draw()}; $("next").onclick=nextTrade;
+  window.addEventListener("resize",draw); draw();
+}
+function events(){const ev=[];R.trades.forEach(t=>{ev.push([t.opened,t.symbol]);ev.push([t.closed,t.symbol])});return ev.sort((a,b)=>a[0]-b[0])}
+function nextTrade(){
+  const now=T[idx], ev=events().find(e=>e[0]>now+1);
+  if(!ev){return}
+  coin=ev[1]; $("coin").value=coin; idx=Math.min(T.length-1,T.findIndex(t=>t>=ev[0])+1); draw();
+}
+function toggle(){
+  playing=!playing; $("play").textContent=playing?"⏸ Pause":"▶ Play";
+  clearInterval(timer);
+  if(playing) timer=setInterval(()=>{
+    const now=T[idx];
+    if($("ff").checked && !R.trades.some(t=>t.opened<=now && t.closed>now)){ // flat: jump to next entry
+      const nx=R.trades.filter(t=>t.opened>now).sort((a,b)=>a.opened-b.opened)[0];
+      if(nx){coin=nx.symbol;$("coin").value=coin;idx=Math.max(idx+1,T.findIndex(t=>t>=nx.opened)-3);draw();return}
+    }
+    idx++; if(idx>=T.length){idx=T.length-1;toggle()} draw();
+  },1000/(+$("speed").value));
+}
+function sizeCanvas(c){const r=c.getBoundingClientRect(), d=devicePixelRatio||1; c.width=r.width*d; c.height=(+c.getAttribute("height"))*d; const g=c.getContext("2d"); g.scale(d,d); return [g,r.width,+c.getAttribute("height")]}
+function css(v){return getComputedStyle(document.body).getPropertyValue(v).trim()}
+function draw(){
+  const now=T[idx]; $("scrub").value=idx; $("clock").textContent=dt(now);
+  const C=R.candles[coin], n=C.o.length, iNow=Math.min(n-1,Math.floor((now-C.t0)/H4)-1);
+  const [g,W,Hh]=sizeCanvas($("chart")); g.clearRect(0,0,W,Hh);
+  const N=Math.min(160,Math.max(20,iNow+1)), i0=Math.max(0,iNow-N+1), cw=(W-70)/N;
+  const live=R.trades.filter(t=>t.symbol===coin && t.opened<=now+H4 && t.closed>now);
+  let lo=Infinity,hi=-Infinity; for(let i=i0;i<=iNow;i++){lo=Math.min(lo,C.l[i]);hi=Math.max(hi,C.h[i]); if(C.sma[i]){lo=Math.min(lo,C.sma[i]);hi=Math.max(hi,C.sma[i])}}
+  live.forEach(t=>{[t.entry,t.stop,t.target].forEach(v=>{if(v){lo=Math.min(lo,v);hi=Math.max(hi,v)}})});
+  if(!isFinite(lo)){return}
+  const pad=(hi-lo)*0.05; lo-=pad; hi+=pad;
+  const X=i=>(i-i0)*cw+cw/2, Y=v=>10+(1-(v-lo)/(hi-lo))*(Hh-30);
+  g.font="11px sans-serif"; g.fillStyle=css("--mut"); g.strokeStyle=css("--line");
+  for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4;g.beginPath();g.moveTo(0,Y(v));g.lineTo(W-70,Y(v));g.stroke();g.fillText(fp(v),W-66,Y(v)+4)}
+  for(let i=i0;i<=iNow;i++){const up=C.c[i]>=C.o[i];g.strokeStyle=g.fillStyle=up?css("--pos"):css("--neg");
+    g.beginPath();g.moveTo(X(i),Y(C.h[i]));g.lineTo(X(i),Y(C.l[i]));g.stroke();
+    const y1=Y(Math.max(C.o[i],C.c[i])),y2=Y(Math.min(C.o[i],C.c[i]));g.fillRect(X(i)-cw*0.35,y1,Math.max(1,cw*0.7),Math.max(1,y2-y1))}
+  g.strokeStyle="#9ca3af";g.lineWidth=1.5;g.beginPath();let st=false;for(let i=i0;i<=iNow;i++){if(!C.sma[i])continue;st?g.lineTo(X(i),Y(C.sma[i])):g.moveTo(X(i),Y(C.sma[i]));st=true}g.stroke();g.lineWidth=1;
+  const ti=t=>Math.floor((t-C.t0)/H4);
+  R.trades.filter(t=>t.symbol===coin).forEach(t=>{
+    const a=ti(t.opened); if(a>=i0&&a<=iNow){g.fillStyle=css("--acc");const x=X(a),y=Y(t.entry),s=t.side==="long"?1:-1;g.beginPath();g.moveTo(x,y+s*8);g.lineTo(x-6,y+s*18);g.lineTo(x+6,y+s*18);g.fill()}
+    const b=ti(t.closed)-0; if(t.closed<=now && b>=i0&&b<=iNow+1){g.fillStyle=t.net>0?css("--pos"):css("--neg");g.beginPath();g.arc(X(Math.min(b,iNow)),Y(t.exit),5,0,7);g.fill()}
+  });
+  live.forEach(t=>{const a=Math.max(i0,ti(t.opened));[[t.target,css("--pos"),"target"],[t.entry,css("--acc"),"entry"],[t.stop,css("--neg"),"stop"]].forEach(([v,c,l])=>{if(!v)return;
+    g.strokeStyle=g.fillStyle=c;g.setLineDash([6,3]);g.beginPath();g.moveTo(X(a),Y(v));g.lineTo(W-70,Y(v));g.stroke();g.setLineDash([]);g.fillText(l+" "+fp(v),W-140,Y(v)-3)})});
+  g.fillStyle=css("--ink");g.font="bold 13px sans-serif";g.fillText(coin+"/USDT perp · 4H",8,22);
+  // equity
+  const [e,W2,H2]=sizeCanvas($("eq")); e.clearRect(0,0,W2,H2);
+  const eq=R.equity.map(x=>x[2]); const mn=Math.min(...eq)*0.98, mx=Math.max(...eq)*1.02;
+  const EX=i=>i/(T.length-1)*(W2-10), EY=v=>5+(1-(v-mn)/(mx-mn))*(H2-20);
+  e.strokeStyle=css("--acc");e.lineWidth=1.5;e.beginPath();eq.forEach((v,i)=>i?e.lineTo(EX(i),EY(v)):e.moveTo(EX(i),EY(v)));e.stroke();
+  e.strokeStyle=css("--mut");e.setLineDash([4,4]);e.beginPath();e.moveTo(0,EY(R.summary.start_balance));e.lineTo(W2,EY(R.summary.start_balance));e.stroke();e.setLineDash([]);
+  e.strokeStyle=css("--ink");e.beginPath();e.moveTo(EX(idx),0);e.lineTo(EX(idx),H2);e.stroke();
+  e.fillStyle=css("--mut");e.font="11px sans-serif";e.fillText(fmt(mx/1.02,0),4,12);e.fillText(new Date(tmin).getFullYear(),4,H2-4);e.fillText(new Date(tmax).getFullYear(),W2-36,H2-4);
+  // account + positions + log
+  const cur=R.equity[idx]; $("acct").innerHTML=`Wallet <b>${fmt(cur[1])}</b> · Equity <b>${fmt(cur[2])}</b> · ${((cur[2]/R.summary.start_balance-1)*100).toFixed(1)}%`;
+  const op=R.trades.filter(t=>t.opened<=now && t.closed>now);
+  $("open").innerHTML=op.length?op.map(t=>`<div class="pos-row"><b>${t.symbol}</b> <span class="badge">${t.side.toUpperCase()}</span> entry ${fp(t.entry)} · stop ${fp(t.stop||0)} · target ${fp(t.target||0)}</div>`).join(""):'<div class="small mut">Flat — waiting for a signal.</div>';
+  const past=[];R.trades.forEach(t=>{if(t.opened<=now)past.push([t.opened,`<b>${t.symbol}</b> opened ${t.side.toUpperCase()} @ ${fp(t.entry)}`]);if(t.closed<=now)past.push([t.closed,`<b>${t.symbol}</b> closed (${t.reason.replace("_"," ")}) @ ${fp(t.exit)} <span class="${t.net>0?"pos":"neg"}">${fmt(t.net)}</span>`])});
+  $("log").innerHTML=past.sort((a,b)=>b[0]-a[0]).slice(0,80).map(p=>`<div><span class="mut">${dt(p[0])}</span><br>${p[1]}</div>`).join("")||'<div class="mut">No trades yet.</div>';
+}
+</script></body></html>"""
+
+
+def write_viewer(out):
+    (Path(out) / "index.html").write_text(HTML)

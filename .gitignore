@@ -1,2 +1,5 @@
 __pycache__/
 *.pyc
+data_fut/
+research_data/
+.pytest_cache/

@@ -1,0 +1,61 @@
+name: exchange-replay
+# Replays 2022 -> today of Binance futures 1-minute history through the simulated exchange with the bot,
+# then publishes the replay viewer to https://priyanshubawse13.github.io/crypto-paper-bot/replay/
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "41 9 * * 0"          # weekly, Sunday (adds the new week of data)
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: paper-trade
+  cancel-in-progress: false
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt pyarrow
+      - name: Restore 1-minute futures data
+        uses: actions/cache/restore@v4
+        with:
+          path: data_fut
+          key: futdata-${{ github.run_id }}
+          restore-keys: futdata-
+      - name: Download new months of Binance futures data (1m klines, mark price, funding)
+        run: python -m simex.fetch_data --start 2022-01
+      - uses: actions/cache/save@v4
+        with:
+          path: data_fut
+          key: futdata-${{ github.run_id }}
+      - name: Rotation basket (Binance.US 4H)
+        run: mkdir -p research_data && cd research_data && python ../tools/fetch_history.py > /dev/null
+      - name: Replay v3_main
+        run: python -m simex.run_sim --data data_fut --regime research_data/data --variant v3_main --out site/replay
+      - name: Replay v3_no_rotation (comparison)
+        run: python -m simex.run_sim --data data_fut --regime research_data/data --variant v3_no_rotation --out site/replay/no-rotation
+      - name: Save replay
+        run: |
+          git config user.name "paper-bot"; git config user.email "paper-bot@users.noreply.github.com"
+          git add site/replay
+          git diff --cached --quiet || git commit -m "exchange replay $(date -u +'%Y-%m-%d')"
+          git pull --rebase --quiet || true
+          git push
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: site }
+
+  pages:
+    needs: replay
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.deploy.outputs.page_url }}" }
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

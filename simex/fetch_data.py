@@ -22,7 +22,7 @@ from pathlib import Path
 import pandas as pd
 
 BASE = "https://data.binance.vision/data/futures/um"
-SYMBOLS = "SOL XRP DOGE ADA LINK AVAX SUI LTC BNB NEAR XLM HBAR BTC ETH".split()
+SYMBOLS = "SOL XRP DOGE ADA LINK AVAX SUI LTC BNB NEAR XLM HBAR BTC".split()
 OUT = Path("data_fut")
 
 
