@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html
+import json
 import math
 
 import pandas as pd
@@ -263,10 +264,10 @@ footer{{margin-top:36px;color:var(--mut);font-size:13px}}
   <div><span>Market</span><b>{esc(regime)}</b> <span class="small">{ups} of {ups + downs} coins above 50-day avg · BTC {'above' if btc_up else 'below'}</span></div>
 </div>
 {rotation_section(reg, now)}
+{live_section(states, variants)}
 <h2>Scoreboard</h2><div class="cards">{''.join(cards)}</div>
-<h2>Equity over time</h2>{svg_equity(states, variants)}
 <h2>Charts</h2>{charts_section(states, variants, raw, btc, pairs, now)}
-<h2>Open trades</h2>{table(["Version","Coin","Side","Opened","Entry","Stop","Target","Now","P/L","R now","Margin"], open_rows, "No open trades right now.")}
+<h2>Equity over time</h2>{svg_equity(states, variants)}
 <h2>Where it's lagging &amp; what to improve</h2>
 <p class="muted small">Automatic checks against the backtest. R = profit measured in units of the amount risked (−1R = a normal stop-out, +1.5R = a normal win).</p>
 <div class="dgs">{''.join(diag)}</div>
@@ -282,19 +283,35 @@ Short: coin and BTC below their 50-day avg, close below the 20-day low, EMA20 be
 stop 2.5× ATR; take profit at 1.5× the stop distance for longs, 1× for shorts;
 exit if price closes back across the 50-day average; 1% risk per trade, max 3 open; 12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
 Not modelled: funding fees and the funding-rate filter of the real futures bot. Times in Chicago time.</footer>
-</main></body></html>"""
+</main>
+<script>setTimeout(()=>{{if(!document.hidden)location.reload()}},10*60*1000);document.addEventListener("visibilitychange",()=>{{if(!document.hidden&&performance.now()>10*60*1000)location.reload()}});</script>
+</body></html>"""
 
 
-def svg_candles(f: pd.DataFrame, pair: str, st: dict, n: int = 120, w: int = 1000, h: int = 340) -> str:
-    """Candlestick chart of the last n closed 4H candles with averages, breakout levels and the main version's trades."""
+def svg_candles(f: pd.DataFrame, pair: str, books: list, n: int = 120, w: int = 1000, h: int = 340) -> str:
+    """Candlestick chart of the last n closed 4H candles with averages, breakout levels and every version's trades.
+    books = [(version_name, colour, state), ...]; identical open trades held by several versions are drawn once."""
     d = f.tail(n)
     if len(d) < 10:
         return ""
     pad_l, pad_r, pad_t, pad_b = 8, 62, 10, 22
     t0, t1 = d.index[0], d.index[-1]
     span = (t1 - t0).total_seconds() or 1
-    trades_open = [t for p, t in st["open"].items() if p == pair]
-    trades_closed = [c for c in st["closed"] if c["pair"] == pair and pd.Timestamp(c["closed"]) >= t0]
+    t0_ = t0
+    merged = {}
+    for vn, colr, st in books:
+        for p, t in st["open"].items():
+            if p == pair:
+                k = (t["side"], round(t["entry"], 10), t["opened"])
+                merged.setdefault(k, dict(t, versions=[], colour=colr))["versions"].append(vn)
+    trades_open = list(merged.values())
+    seen, trades_closed = set(), []
+    for vn, colr, st in books:
+        for c in st["closed"]:
+            k = (c["side"], round(c["entry"], 10), c["opened"])
+            if c["pair"] == pair and pd.Timestamp(c["closed"]) >= t0_ and k not in seen:
+                seen.add(k)
+                trades_closed.append(dict(c, colour=colr, versions=[vn]))
     levels = [x for t in trades_open for x in (t["stop"], t["target"], t["entry"])]
     cols = [c for c in ("sma300", "ema20", "hh120", "ll120") if c in d]
     lo = min(d["low"].min(), *(d[c].min() for c in cols), *levels) if levels else min(d["low"].min(), *(d[c].min() for c in cols))
@@ -329,14 +346,14 @@ def svg_candles(f: pd.DataFrame, pair: str, st: dict, n: int = 120, w: int = 100
         for val, col, lab in ((t["target"], "var(--pos)", "target"), (t["entry"], "#2563eb", "entry"), (t["stop"], "var(--neg)", "stop")):
             g.append(f'<line x1="{xs:.1f}" y1="{Y(val):.1f}" x2="{w - pad_r}" y2="{Y(val):.1f}" stroke="{col}" stroke-width="1.5" stroke-dasharray="6 3"/>'
                      f'<text x="{w - pad_r - 4}" y="{Y(val) + (12 if lab == "target" and t["side"] == -1 or lab == "stop" and t["side"] == 1 else -4):.1f}" '
-                     f'class="axis" text-anchor="end" style="fill:{col};font-weight:600">{lab} {val:.4g}</text>')
+                     f'class="axis" text-anchor="end" style="fill:{col};font-weight:600">{("SHORT " if t["side"] == -1 else "LONG ") if lab == "entry" else ""}{lab} {val:.4g}</text>')
     for c in trades_closed + [dict(t, side="long" if t["side"] == 1 else "short") for t in trades_open]:
         ot = pd.Timestamp(c["opened"])
         if ot >= t0:
             x, y = X(ot), Y(c["entry"])
             tri = (f"{x:.1f},{y + 9:.1f} {x - 6:.1f},{y + 19:.1f} {x + 6:.1f},{y + 19:.1f}" if c["side"] == "long"
                    else f"{x:.1f},{y - 9:.1f} {x - 6:.1f},{y - 19:.1f} {x + 6:.1f},{y - 19:.1f}")
-            g.append(f'<polygon points="{tri}" fill="#2563eb"><title>{c["side"]} entry {c["entry"]:.5g}</title></polygon>')
+            g.append(f'<polygon points="{tri}" fill="{c.get("colour", "#2563eb")}"><title>{", ".join(c.get("versions", []))}: {c["side"]} entry {c["entry"]:.5g}</title></polygon>')
         if "exit" in c:
             x, y = X(min(pd.Timestamp(c["closed"]) - CANDLE, t1)), Y(c["exit"])
             col = "var(--pos)" if c["pnl"] > 0 else "var(--neg)"
@@ -348,27 +365,87 @@ def svg_candles(f: pd.DataFrame, pair: str, st: dict, n: int = 120, w: int = 100
 
 def charts_section(states: dict, variants, raw: dict, btc: pd.DataFrame, pairs: list, now: pd.Timestamp) -> str:
     main = variants[0]
-    st = states[main.name]
-    order = sorted(pairs, key=lambda p: (p not in st["open"], p))
+    books = [(v.name, COLORS.get(v.name, "#2563eb"), states[v.name]) for v in variants]
+    held = {}
+    for vn, _, st in books:
+        for p, t in st["open"].items():
+            held.setdefault(p, {}).setdefault("LONG" if t["side"] == 1 else "SHORT", []).append(vn)
+    order = sorted(pairs, key=lambda p: (p not in held, p))
     out = []
     for p in order:
         f = indicators(raw[p], btc, main)
         f = f[f.index + CANDLE <= now]
-        svg = svg_candles(f, p, st)
+        svg = svg_candles(f, p, books)
         if not svg:
             continue
         tv = f"https://www.tradingview.com/chart/?symbol=BINANCE:{p}USDT.P&interval=240"
-        tag = ""
-        if p in st["open"]:
-            t = st["open"][p]
-            tag = f' <span class="tag ok">{"LONG" if t["side"] == 1 else "SHORT"} open</span>'
-        out.append(f'<details {"open" if p in st["open"] else ""} class="cd"><summary><b>{esc(p)}</b>{tag}'
+        tag = "".join(f' <span class="tag {"ok" if side == "LONG" else "warn"}">{side} open · {", ".join(vs)}</span>' for side, vs in held.get(p, {}).items())
+        out.append(f'<details {"open" if p in held else ""} class="cd"><summary><b>{esc(p)}</b>{tag}'
                    f' <span class="muted small">last 20 days, 4H</span></summary>{svg}'
                    f'<div class="small"><a href="{tv}" target="_blank" rel="noopener">Open live {esc(p)} chart on TradingView ↗</a></div></details>')
+    keys = " ".join(f'<span class="key"><i style="background:{COLORS.get(v.name)}"></i>{esc(v.name)}</span>' for v in variants)
     legend = ('<p class="muted small">Grey = 50-day average (trend) · orange = EMA20 · blue dotted = 20-day high / low (breakout levels) · '
-              '▲ long entry, ▼ short entry · dots = exits (green profit, red loss) · dashed lines = open trade entry / stop / target. '
-              f'Trades shown are {esc(main.name)}. Coins with an open trade are listed first and expanded.</p>')
+              '▲ long entry, ▼ short entry (coloured by version) · dots = exits (green profit, red loss) · dashed lines = open trade entry / stop / target. '
+              f'Coins with an open trade (any version) are listed first and expanded.</p><div class="legend">{keys}</div>')
     return legend + "".join(out)
+
+
+def live_section(states: dict, variants) -> str:
+    """Open trades of every version, with prices and P/L refreshed in the browser every 15 s."""
+    rows, data = [], []
+    for v in variants:
+        st = states[v.name]
+        for p, t in st["open"].items():
+            px = st.get("last_prices", {}).get(p, t["entry"])
+            i = len(data)
+            data.append({"v": v.name, "p": p, "side": t["side"], "entry": t["entry"], "stop": t["stop"], "target": t["target"],
+                         "qty": t["qty"], "risk": t["qty"] * t["entry"] * t["sp"], "px": px})
+            side = "LONG" if t["side"] == 1 else "SHORT"
+            rows.append(f'<tr data-i="{i}"><td><span class="key"><i style="background:{COLORS.get(v.name)}"></i></span>{esc(v.name)}</td>'
+                        f'<td><b>{esc(p)}</b></td><td><span class="tag {"ok" if side == "LONG" else "warn"}">{side}</span></td>'
+                        f'<td>{chi(t["opened"])}</td><td>{t["entry"]:.5g}</td><td class="neg">{t["stop"]:.5g}</td><td class="pos">{t["target"]:.5g}</td>'
+                        f'<td class="lp">{px:.5g}</td><td class="lpl"></td><td class="lr"></td><td class="bar"></td><td>{fmt_money(t["margin"])}</td></tr>')
+    if not rows:
+        return '<h2>Live trades</h2><p class="muted">No open trades in any version right now. This table fills in (with live prices) as soon as one opens.</p>'
+    head = "".join(f"<th>{h}</th>" for h in ["Version", "Coin", "Side", "Opened", "Entry", "Stop", "Target", "Live price", "Live P/L", "R", "Stop ← → Target", "Margin"])
+    return f"""<h2>Live trades <span id="livestat" class="muted small"></span></h2>
+<div class="tw"><table id="live"><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>
+<p class="muted small">Prices refresh every 15 s straight from Binance.US in your browser (Coinbase as backup). The bot itself only acts on 4H closes,
+so a trade can be past its target here and still be open until the candle closes. Paper money.</p>
+<script>
+(()=>{{
+const T={json.dumps(data)};
+const f=(x)=>{{const a=Math.abs(x);return a>=100?x.toFixed(2):a>=1?x.toFixed(4):x.toPrecision(5)}};
+function paint(prices,src){{
+  document.querySelectorAll("#live tbody tr").forEach(tr=>{{
+    const t=T[+tr.dataset.i], px=prices[t.p]??t.px, pl=t.side*t.qty*(px-t.entry), r=pl/t.risk;
+    tr.querySelector(".lp").textContent=f(px);
+    const c=tr.querySelector(".lpl"); c.textContent=(pl>=0?"+":"-")+"$"+Math.abs(pl).toFixed(2); c.className="lpl "+(pl>=0?"pos":"neg");
+    tr.querySelector(".lr").textContent=(r>=0?"+":"")+r.toFixed(2)+"R";
+    // position between stop (0%) and target (100%), entry marked
+    const span=t.target-t.stop, pos=Math.max(0,Math.min(1,(px-t.stop)/span)), ent=(t.entry-t.stop)/span;
+    tr.querySelector(".bar").innerHTML=`<div style="position:relative;width:140px;height:8px;border-radius:4px;background:linear-gradient(90deg,var(--neg),var(--line) ${{ent*100}}%,var(--pos))">
+      <div style="position:absolute;left:${{ent*100}}%;top:-3px;width:2px;height:14px;background:var(--mut)"></div>
+      <div style="position:absolute;left:calc(${{pos*100}}% - 5px);top:-2px;width:10px;height:12px;border-radius:6px;background:var(--ink)"></div></div>`;
+  }});
+  document.getElementById("livestat").textContent=src?`· live from ${{src}} at ${{new Date().toLocaleTimeString()}}`:"· live prices unavailable, showing last bot update";
+}}
+async function tick(){{
+  const coins=[...new Set(T.map(t=>t.p))], out={{}};
+  try{{
+    const syms=encodeURIComponent(JSON.stringify(coins.map(c=>c+"USDT")));
+    const r=await fetch(`https://api.binance.us/api/v3/ticker/price?symbols=${{syms}}`,{{cache:"no-store"}});
+    if(!r.ok)throw 0; (await r.json()).forEach(x=>out[x.symbol.replace("USDT","")]=+x.price); paint(out,"Binance.US"); return;
+  }}catch(e){{}}
+  try{{
+    await Promise.all(coins.map(async c=>{{const r=await fetch(`https://api.exchange.coinbase.com/products/${{c}}-USD/ticker`);if(r.ok)out[c]=+(await r.json()).price}}));
+    if(Object.keys(out).length){{paint(out,"Coinbase");return}}
+  }}catch(e){{}}
+  paint({{}},null);
+}}
+paint({{}},null); tick(); setInterval(tick,15000);
+}})();
+</script>"""
 
 
 PHASE_INFO = {
