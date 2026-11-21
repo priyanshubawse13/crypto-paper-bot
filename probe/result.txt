@@ -1,0 +1,13 @@
+200 1698240 https://data.binance.vision/data/futures/um/monthly/klines/SOLUSDT/1m/SOLUSDT-1m-2024-01.zip
+200 1058155 https://data.binance.vision/data/futures/um/monthly/markPriceKlines/SOLUSDT/1m/SOLUSDT-1m-2024-01.zip
+200 697 https://data.binance.vision/data/futures/um/monthly/fundingRate/SOLUSDT/SOLUSDT-fundingRate-2024-01.zip
+200 56694 https://data.binance.vision/data/futures/um/daily/klines/SOLUSDT/1m/SOLUSDT-1m-2026-11-19.zip
+451 224 https://fapi.binance.com/fapi/v1/exchangeInfo
+451 224 https://fapi.binance.com/fapi/v1/klines?symbol=SOLUSDT&interval=1m&limit=5
+404 148 https://www.binance.com/bapi/futures/v1/public/future/common/get-leverage-bracket
+open_time,open,high,low,close,volume,close_time,quote_volume,count,taker_buy_volume,taker_buy_quote_volume,ignore
+1704067200000,101.7750,101.8630,101.6000,101.7570,20309,1704067259999,2066106.2130,2705,10358,1053808.7620,0
+1704067260000,101.7570,101.9880,101.7570,101.9460,16508,1704067319999,1681452.1060,2314,9771,995286.9190,0
+calc_time,funding_interval_hours,last_funding_rate
+1704067200000,8,0.00022410
+1704096000000,8,0.00032989
