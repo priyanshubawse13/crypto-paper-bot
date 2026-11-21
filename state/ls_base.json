@@ -1,0 +1,27 @@
+{
+ "variant": "ls_base",
+ "cash": 100.0,
+ "open": {},
+ "pending": {},
+ "closed": [],
+ "sl_times": [],
+ "pause_until": null,
+ "last_t": "2026-11-20T20:00:00+00:00",
+ "equity_curve": [
+  [
+   "2026-11-21T00:00:00+00:00",
+   100.0
+  ]
+ ],
+ "started": "2026-11-21T00:00:00+00:00",
+ "last_prices": {
+  "SOL": 68.56,
+  "XRP": 0.9035,
+  "DOGE": 0.0546,
+  "ADA": 0.14281,
+  "LINK": 8.538,
+  "AVAX": 6.465,
+  "SUI": 0.646,
+  "LTC": 40.58
+ }
+}
