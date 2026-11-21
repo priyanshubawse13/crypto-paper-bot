@@ -1,0 +1,89 @@
+{
+ "name": "1h_bounce_r2be1",
+ "tf": "1h",
+ "setups": "bounce",
+ "htf_filter": true,
+ "r_mult": 2.0,
+ "be_at": 1.0,
+ "max_bars": 24,
+ "leverage": 20.0,
+ "risk": 0.01,
+ "pairs": 12,
+ "final_equity": 49.6,
+ "max_drawdown_pct": 50.4,
+ "all": {
+  "n": 220,
+  "win_rate": 0.259,
+  "avg_R_gross": -0.167,
+  "avg_R_net": -0.294,
+  "cost_R_per_trade": 0.127,
+  "net_usd": -50.4,
+  "pf": 0.56
+ },
+ "first_half": {
+  "n": 220,
+  "win_rate": 0.259,
+  "avg_R_gross": -0.167,
+  "avg_R_net": -0.294,
+  "cost_R_per_trade": 0.127,
+  "net_usd": -50.4,
+  "pf": 0.56
+ },
+ "second_half": {
+  "n": 0
+ },
+ "by_setup_side": {
+  "bounce_long": {
+   "n": 63,
+   "win_rate": 0.206,
+   "avg_R_gross": -0.334,
+   "avg_R_net": -0.447,
+   "cost_R_per_trade": 0.113,
+   "net_usd": -19.84,
+   "pf": 0.4
+  },
+  "bounce_short": {
+   "n": 157,
+   "win_rate": 0.28,
+   "avg_R_gross": -0.1,
+   "avg_R_net": -0.233,
+   "cost_R_per_trade": 0.133,
+   "net_usd": -30.56,
+   "pf": 0.62
+  }
+ },
+ "by_exit": {
+  "breakeven": {
+   "size": 39,
+   "mean": -0.015
+  },
+  "stop": {
+   "size": 132,
+   "mean": -1.15
+  },
+  "take_profit": {
+   "size": 47,
+   "mean": 1.847
+  },
+  "time_exit": {
+   "size": 2,
+   "mean": 0.448
+  }
+ },
+ "by_year": {
+  "2022": -47.06,
+  "2023": -3.34
+ },
+ "fees": 17.25,
+ "gst": 3.11,
+ "funding": -0.12,
+ "slippage": 6.93,
+ "liquidations": 0,
+ "skipped": {
+  "min_notional": 3,
+  "rejected": 0,
+  "too_wide": 9
+ },
+ "leverage_used_avg": 20.0,
+ "runtime_s": 6.8
+}
