@@ -23,39 +23,39 @@ table{border-collapse:collapse;width:100%;font-size:13px} th,td{padding:8px 10px
 footer{margin-top:36px;color:var(--mut);font-size:13px}
 </style></head><body><main>
 <h1>Crypto paper-trading bot</h1>
-<div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100</div>
+<div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100 · v2_main is the strategy, the other two are for comparison</div>
 <div class="banner">
-  <div><span>Last update</span><b>Nov 20, 08:52 PM</b></div>
-  <div><span>Next update</span><b>~Nov 20, 10:07 PM</b></div>
-  <div><span>Running since</span><b>Nov 20, 06:00 PM</b></div>
+  <div><span>Last update</span><b>Nov 20, 10:23 PM</b></div>
+  <div><span>Next update</span><b>~Nov 21, 02:07 AM</b></div>
+  <div><span>Running since</span><b>Nov 20, 10:00 PM</b></div>
   <div><span>Market</span><b>Downtrend: bot looks for short breakdowns</b> <span class="small">0 of 8 coins above 50-day avg · BTC below</span></div>
 </div>
 <h2>Scoreboard</h2><div class="cards">
         <div class="card" style="border-top:4px solid #2563eb">
-          <div class="ch"><b>ls_base</b><span class="tag ok">active</span></div>
-          <div class="muted small">Main strategy: long breakouts in uptrends, short breakdowns in downtrends</div>
-          <div class="big ">$100.00</div>
-          <div class="muted">+0.00% since start · includes open trades</div>
+          <div class="ch"><b>v2_main</b><span class="tag ok">active</span></div>
+          <div class="muted small">NEW: longs unchanged; shorts only when EMA20&lt;EMA50, RSI 20-50, not stretched &gt;3 ATR below EMA20; short target 1R</div>
+          <div class="big pos">$100.52</div>
+          <div class="muted">+0.52% since start · includes open trades</div>
           <div class="grid4">
             <div><span>Trades</span><b>0</b></div><div><span>Win rate</span><b>—</b></div>
             <div><span>Profit factor</span><b>—</b></div><div><span>Avg trade</span><b>—</b></div>
-            <div><span>Open now</span><b>0</b></div><div><span>Worst drop</span><b>0.0%</b></div>
+            <div><span>Open now</span><b>3</b></div><div><span>Worst drop</span><b>0.0%</b></div>
           </div>
         </div>
         <div class="card" style="border-top:4px solid #d97706">
-          <div class="ch"><b>ls_vol13</b><span class="tag ok">active</span></div>
-          <div class="muted small">Same + breakout candle volume &gt; 1.3x average</div>
-          <div class="big ">$100.00</div>
-          <div class="muted">+0.00% since start · includes open trades</div>
+          <div class="ch"><b>v1_old</b><span class="tag ok">active</span></div>
+          <div class="muted small">Old version: shorts are the exact mirror of longs (comparison)</div>
+          <div class="big pos">$100.55</div>
+          <div class="muted">+0.55% since start · includes open trades</div>
           <div class="grid4">
             <div><span>Trades</span><b>0</b></div><div><span>Win rate</span><b>—</b></div>
             <div><span>Profit factor</span><b>—</b></div><div><span>Avg trade</span><b>—</b></div>
-            <div><span>Open now</span><b>0</b></div><div><span>Worst drop</span><b>0.0%</b></div>
+            <div><span>Open now</span><b>3</b></div><div><span>Worst drop</span><b>0.0%</b></div>
           </div>
         </div>
         <div class="card" style="border-top:4px solid #7c3aed">
-          <div class="ch"><b>ls_vol15</b><span class="tag ok">active</span></div>
-          <div class="muted small">Same + breakout candle volume &gt; 1.5x average</div>
+          <div class="ch"><b>longs_only</b><span class="tag ok">active</span></div>
+          <div class="muted small">Longs only, sits in cash in downtrends (comparison)</div>
           <div class="big ">$100.00</div>
           <div class="muted">+0.00% since start · includes open trades</div>
           <div class="grid4">
@@ -65,18 +65,20 @@ footer{margin-top:36px;color:var(--mut);font-size:13px}
           </div>
         </div></div>
 <h2>Equity over time</h2><p class="muted">The equity chart appears after a few runs.</p>
-<h2>Open trades</h2><p class="muted">No open trades right now.</p>
+<h2>Open trades</h2><div class="tw"><table><thead><tr><th>Version</th><th>Coin</th><th>Side</th><th>Opened</th><th>Entry</th><th>Stop</th><th>Target</th><th>Now</th><th>P/L</th><th>R now</th><th>Margin</th></tr></thead><tbody><tr><td>v2_main</td><td><b>SOL</b></td><td>SHORT</td><td>Nov 20, 10:00 PM</td><td>66.29</td><td>71.256</td><td>61.324</td><td>65.27</td><td><span class="pos">+$0.21</span></td><td>+0.21R</td><td>$6.67</td></tr><tr><td>v2_main</td><td><b>XRP</b></td><td>SHORT</td><td>Nov 20, 10:00 PM</td><td>0.8815</td><td>0.94516</td><td>0.81784</td><td>0.8726</td><td><span class="pos">+$0.14</span></td><td>+0.14R</td><td>$6.92</td></tr><tr><td>v2_main</td><td><b>ADA</b></td><td>SHORT</td><td>Nov 20, 10:00 PM</td><td>0.13644</td><td>0.14726</td><td>0.12562</td><td>0.13434</td><td><span class="pos">+$0.19</span></td><td>+0.19R</td><td>$6.30</td></tr><tr><td>v1_old</td><td><b>SOL</b></td><td>SHORT</td><td>Nov 20, 10:00 PM</td><td>66.29</td><td>71.256</td><td>58.841</td><td>65.27</td><td><span class="pos">+$0.21</span></td><td>+0.21R</td><td>$6.67</td></tr><tr><td>v1_old</td><td><b>XRP</b></td><td>SHORT</td><td>Nov 20, 10:00 PM</td><td>0.8815</td><td>0.94516</td><td>0.78601</td><td>0.8726</td><td><span class="pos">+$0.14</span></td><td>+0.14R</td><td>$6.92</td></tr><tr><td>v1_old</td><td><b>DOGE</b></td><td>SHORT</td><td>Nov 20, 10:00 PM</td><td>0.05211</td><td>0.055848</td><td>0.046504</td><td>0.05126</td><td><span class="pos">+$0.23</span></td><td>+0.23R</td><td>$6.97</td></tr></tbody></table></div>
 <h2>Where it's lagging &amp; what to improve</h2>
 <p class="muted small">Automatic checks against the backtest. R = profit measured in units of the amount risked (−1R = a normal stop-out, +1.5R = a normal win).</p>
-<div class="dgs"><div class="dg"><h3 style="color:#2563eb">ls_base</h3><ul><li class="info">No closed trades yet. Diagnostics start after the first trades close.</li></ul></div><div class="dg"><h3 style="color:#d97706">ls_vol13</h3><ul><li class="info">No closed trades yet. Diagnostics start after the first trades close.</li></ul></div><div class="dg"><h3 style="color:#7c3aed">ls_vol15</h3><ul><li class="info">No closed trades yet. Diagnostics start after the first trades close.</li></ul></div></div>
+<div class="dgs"><div class="dg"><h3 style="color:#2563eb">v2_main</h3><ul><li class="info">No closed trades yet. Diagnostics start after the first trades close.</li></ul></div><div class="dg"><h3 style="color:#d97706">v1_old</h3><ul><li class="info">No closed trades yet. Diagnostics start after the first trades close.</li></ul></div><div class="dg"><h3 style="color:#7c3aed">longs_only</h3><ul><li class="info">No closed trades yet. Diagnostics start after the first trades close.</li></ul></div></div>
 <h2>Closed trades (latest 40)</h2>
 <p class="muted small">Best / worst = the furthest the trade went in your favour / against you before it closed, in R.</p>
 <p class="muted">No closed trades yet.</p>
 <h2>Breakdown</h2><p class="muted">Appears after the first closed trade.</p>
 <h2>Market check (last closed 4H candle)</h2>
-<p class="muted small">Long needs: coin above 50-day avg, BTC above its 50-day avg, close above the 20-day high. Short is the mirror image.</p>
-<div class="tw"><table><thead><tr><th>Coin</th><th>vs 50-day avg</th><th>Price</th><th>To 20-day high</th><th>To 20-day low</th><th>Signal</th></tr></thead><tbody><tr><td>SOL</td><td>below</td><td>68.9</td><td>+42.4%</td><td>-2.1%</td><td>—</td></tr><tr><td>XRP</td><td>below</td><td>0.9112</td><td>+47.1%</td><td>-2.1%</td><td>—</td></tr><tr><td>DOGE</td><td>below</td><td>0.05446</td><td>+43.8%</td><td>-2.9%</td><td>—</td></tr><tr><td>ADA</td><td>below</td><td>0.14323</td><td>+40.5%</td><td>-3.6%</td><td>—</td></tr><tr><td>LINK</td><td>below</td><td>8.569</td><td>+39.6%</td><td>-3.7%</td><td>—</td></tr><tr><td>AVAX</td><td>below</td><td>6.545</td><td>+39.8%</td><td>-2.0%</td><td>—</td></tr><tr><td>SUI</td><td>below</td><td>0.6512</td><td>+46.7%</td><td>-2.0%</td><td>—</td></tr><tr><td>LTC</td><td>below</td><td>40.66</td><td>+40.1%</td><td>-2.6%</td><td>—</td></tr></tbody></table></div>
-<footer>Rules: 20-day breakout/breakdown in the direction of the 50-day trend (coin and BTC); stop 2.5× ATR; take profit at 1.5× the stop distance;
+<p class="muted small">Signals shown for v2_main. Long: coin and BTC above their 50-day avg, close above the 20-day high.
+Short: coin and BTC below their 50-day avg, close below the 20-day low, EMA20 below EMA50, RSI between 20 and 50, and price not more than 3 ATR below EMA20.</p>
+<div class="tw"><table><thead><tr><th>Coin</th><th>vs 50-day avg</th><th>Price</th><th>To 20-day high</th><th>To 20-day low</th><th>Signal</th></tr></thead><tbody><tr><td>SOL</td><td>below</td><td>66.28</td><td>+48.0%</td><td>--1.3%</td><td><b>SELL (short)</b></td></tr><tr><td>XRP</td><td>below</td><td>0.8814</td><td>+52.1%</td><td>--0.3%</td><td><b>SELL (short)</b></td></tr><tr><td>DOGE</td><td>below</td><td>0.05186</td><td>+51.0%</td><td>--1.4%</td><td>—</td></tr><tr><td>ADA</td><td>below</td><td>0.13643</td><td>+47.5%</td><td>--1.2%</td><td><b>SELL (short)</b></td></tr><tr><td>LINK</td><td>below</td><td>8.175</td><td>+44.9%</td><td>--0.9%</td><td><b>SELL (short)</b></td></tr><tr><td>AVAX</td><td>below</td><td>6.168</td><td>+48.4%</td><td>--4.0%</td><td>—</td></tr><tr><td>SUI</td><td>below</td><td>0.6109</td><td>+56.4%</td><td>--3.5%</td><td>—</td></tr><tr><td>LTC</td><td>below</td><td>38.72</td><td>+47.1%</td><td>--2.1%</td><td>—</td></tr></tbody></table></div>
+<footer>Rules (v2_main): 20-day breakout/breakdown in the direction of the 50-day trend (coin and BTC); shorts also need EMA20 &lt; EMA50, RSI 20-50 and price not overstretched;
+stop 2.5× ATR; take profit at 1.5× the stop distance for longs, 1× for shorts;
 exit if price closes back across the 50-day average; 1% risk per trade, max 3 open; 12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
 Not modelled: funding fees and the funding-rate filter of the real futures bot. Times in Chicago time.</footer>
 </main></body></html>
