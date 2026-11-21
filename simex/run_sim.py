@@ -26,7 +26,7 @@ H4 = 4 * 3600_000
 PAIRS12 = "SOL XRP DOGE ADA LINK AVAX SUI LTC BNB NEAR XLM HBAR".split()
 BASKET = ("SOL XRP DOGE ADA LINK AVAX SUI LTC BNB DOT ATOM NEAR UNI AAVE FIL APT ARB OP HBAR XLM TRX BCH SHIB PEPE ETC "
           "ALGO SEI TIA RENDER FET WIF BONK ENA ONDO POL ICP VET GRT CRV LDO JUP PENGU TRUMP").split()
-MAIN_SHORT = dict(s_ema_rsi=True, s_rsi_lo=20, s_rsi_hi=50, s_squeeze=3.0, s_r_mult=1.0)
+MAIN_SHORT = dict(s_ema_rsi=True, s_rsi_lo=20, s_rsi_hi=50, s_squeeze=3.0, s_r_mult=1.0, leverage=5.0)
 VARIANTS = {
     "v3_main": Variant("v3_main", **MAIN_SHORT, rot_no_alt_season_longs=True, rot_no_gold_shorts=True),
     "v3_no_rotation": Variant("v3_no_rotation", **MAIN_SHORT),

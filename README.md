@@ -21,7 +21,7 @@ price not more than 3 ATR below EMA20, target 1R.
 Market rotation (v3): phase from a 43-alt basket vs BTC, ETH/BTC and PAXG(gold)/BTC over 90 days:
 BTC season / ETH season / alt season / risk-off (gold beats BTC) / crypto down without gold bid.
 No alt longs in alt season (late stage, lost money in backtests); no shorts in gold risk-off (break-even in backtests).
-All: stop 2.5x ATR (2-12%); exit if price closes back across the 50-day average; 1% risk per trade, max 3 trades;
+All: 5x isolated leverage (auto-lowered if liquidation would sit inside 1.5x the stop), stop 2.5x ATR (2-12%); exit if price closes back across the 50-day average; 1% risk per trade, max 3 trades;
 12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
 
 Backtest Jan 2022 - Nov 2026 on Binance.US data: v3_main $100 -> $335, worst drop 12.5%, every year positive;
