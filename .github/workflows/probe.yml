@@ -1,0 +1,25 @@
+name: probe-binance
+on: { workflow_dispatch: {} }
+permissions: { contents: write }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p probe
+          for u in \
+            "https://data.binance.vision/data/futures/um/monthly/klines/SOLUSDT/1m/SOLUSDT-1m-2024-01.zip" \
+            "https://data.binance.vision/data/futures/um/monthly/markPriceKlines/SOLUSDT/1m/SOLUSDT-1m-2024-01.zip" \
+            "https://data.binance.vision/data/futures/um/monthly/fundingRate/SOLUSDT/SOLUSDT-fundingRate-2024-01.zip" \
+            "https://data.binance.vision/data/futures/um/daily/klines/SOLUSDT/1m/SOLUSDT-1m-$(date -u -d '2 days ago' +%F).zip" \
+            "https://fapi.binance.com/fapi/v1/exchangeInfo" \
+            "https://fapi.binance.com/fapi/v1/klines?symbol=SOLUSDT&interval=1m&limit=5" \
+            "https://www.binance.com/bapi/futures/v1/public/future/common/get-leverage-bracket" ; do
+            code=$(curl -s -o /tmp/x -w "%{http_code} %{size_download}" "$u"); echo "$code $u" | tee -a probe/result.txt
+          done
+          curl -s "https://data.binance.vision/data/futures/um/monthly/klines/SOLUSDT/1m/SOLUSDT-1m-2024-01.zip" -o probe/sample.zip
+          unzip -p probe/sample.zip | head -3 | tee -a probe/result.txt
+          curl -s "https://data.binance.vision/data/futures/um/monthly/fundingRate/SOLUSDT/SOLUSDT-fundingRate-2024-01.zip" -o f.zip && unzip -p f.zip | head -3 | tee -a probe/result.txt
+          git config user.name paper-bot; git config user.email paper-bot@users.noreply.github.com
+          git checkout --orphan probe-out; git rm -rq --cached .; git add probe; git commit -qm probe; git push -f origin probe-out
