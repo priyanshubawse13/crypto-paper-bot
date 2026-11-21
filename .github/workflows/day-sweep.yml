@@ -1,0 +1,40 @@
+name: day-sweep
+# Tests day-trading setups on 15m / 1h through the simulated exchange, 2022 -> today, 12 coins, one job per config.
+on:
+  workflow_dispatch: {}
+permissions: { contents: write }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        tf: ["1h", "15m"]
+        setup: ["pullback", "sweep", "breakout", "bounce"]
+        exits: ["--r 1.5", "--r 2 --be 1"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt pyarrow
+      - uses: actions/cache/restore@v4
+        with: { path: data_fut, key: futdata-none, restore-keys: futdata- }
+      - name: Run
+        run: |
+          tag="${{ matrix.tf }}_${{ matrix.setup }}_$(echo '${{ matrix.exits }}' | tr -d ' -')"
+          python -m simex.run_day --data data_fut --tf ${{ matrix.tf }} --setups ${{ matrix.setup }} ${{ matrix.exits }} --name "$tag" --out "out/$tag"
+      - uses: actions/upload-artifact@v4
+        with: { name: "day-${{ matrix.tf }}-${{ matrix.setup }}-${{ strategy.job-index }}", path: out }
+  collect:
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: collected, pattern: "day-*", merge-multiple: true }
+      - run: |
+          ls collected
+          git config user.name paper-bot; git config user.email paper-bot@users.noreply.github.com
+          git checkout --orphan day-results; git rm -rq --cached .; git add collected; git commit -qm "day sweep $(date -u +%F)"; git push -f origin day-results

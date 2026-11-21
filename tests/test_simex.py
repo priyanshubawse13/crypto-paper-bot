@@ -123,3 +123,26 @@ def test_closed_position_record_matches_wallet():
     e.create_order("SOL/USDT:USDT", "market", "sell", 0.5, params={"reduceOnly": True})
     r = e.closed_positions[-1]
     assert r["net"] == pytest.approx(e.wallet - 100)
+
+
+def test_intraday_ohlcv():
+    e = ex(bars(list(np.arange(300) * 1.0 + 100)))
+    e.advance(T0 + 75 * MIN)
+    rows = e.fetch_ohlcv("SOL/USDT:USDT", "15m")
+    assert len(rows) == 5 and rows[-1][0] == T0 + 60 * MIN       # 5 closed, the next one has no minutes yet
+    assert rows[-1][4] == 175                                     # close = close of minute 74
+    e.advance(T0 + 80 * MIN)
+    rows = e.fetch_ohlcv("SOL/USDT:USDT", "15m")
+    assert len(rows) == 6 and rows[-1][4] == 180                  # forming candle: only minutes 75-79
+    h1 = e.fetch_ohlcv("SOL/USDT:USDT", "1h")
+    assert h1[0][2] == 160 and h1[0][4] == 160                    # first hour: high/close = minute 59 close
+
+
+def test_stop_before_liquidation_in_same_minute():
+    # one crash minute goes through the stop (110) and the liquidation level (~108.6) -> the stop must win
+    e = ex(bars([113, 113, 112.4, 107, 107], lows=[113, 113, 104.6, 107, 107], flat=True))
+    e.set_leverage(20, "SOL/USDT:USDT")
+    e.create_order("SOL/USDT:USDT", "market", "buy", 0.3)
+    e.create_order("SOL/USDT:USDT", "stop_market", "sell", 0, params={"stopPrice": 110.0, "closePosition": True})
+    e.advance(T0 + 5 * MIN)
+    assert e.totals["liquidations"] == 0 and e.trades[-1]["type"] == "stop_market"

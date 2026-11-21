@@ -34,6 +34,7 @@ import pandas as pd
 
 MIN = 60_000
 H4 = 4 * 3600_000
+TF_MS = {"15m": 15 * MIN, "1h": 60 * MIN, "4h": H4, "1d": 24 * 60 * MIN}
 
 
 @dataclass
@@ -140,7 +141,8 @@ class SimBinanceUSDM:
         self.closed_positions: list[dict] = []  # one row per round trip (opened -> fully closed / liquidated)
         self.events: list[dict] = []          # funding, liquidations, rejections, triggers
         self._ids = itertools.count(1)
-        self._h4 = {s: self._aggregate(b, H4) for s, b in bars.items()}
+        self._agg: dict[int, dict] = {}
+        self._h4 = self.candles(H4)
         self._cursor: dict[str, int] = {}
         self.totals = {"fees": 0.0, "gst": 0.0, "funding": 0.0, "slippage": 0.0, "liquidations": 0}
 
@@ -157,6 +159,13 @@ class SimBinanceUSDM:
         out = pd.DataFrame({"o": g["o"].first(), "h": g["h"].max(), "l": g["l"].min(), "c": g["c"].last(),
                             "v": g["qv"].sum(), "last_t": g["t"].max()})
         return out.rename_axis("t").reset_index()
+
+    def candles(self, ms: int) -> dict:
+        """All candles of a timeframe (built once from the 1m data). Callers must only read rows whose
+        candle has closed (t + ms <= now); fetch_ohlcv enforces that."""
+        if ms not in self._agg:
+            self._agg[ms] = {s: self._aggregate(b, ms) for s, b in self.bars.items()}
+        return self._agg[ms]
 
     def _idx(self, s: str, t: int) -> int:
         return int(np.searchsorted(self.bars[s].t, t, side="left"))
@@ -192,11 +201,11 @@ class SimBinanceUSDM:
 
     def fetch_ohlcv(self, symbol: str, timeframe: str = "4h", since: int | None = None, limit: int = 500) -> list:
         """Closed candles plus the still-forming one, exactly what the real API returns at self.now."""
-        assert timeframe == "4h", "only 4h is pre-aggregated"
+        ms = TF_MS[timeframe]
         s = self.sym(symbol)
-        df = self._h4[s]
+        df = self.candles(ms)[s]
         df = df[df["t"] < self.now]
-        if len(df) and df["t"].iloc[-1] + H4 > self.now:      # forming candle: only minutes that have happened
+        if len(df) and df["t"].iloc[-1] + ms > self.now:      # forming candle: only minutes that have happened
             b, t0 = self.bars[s], int(df["t"].iloc[-1])
             i0, i1 = self._idx(s, t0), self._idx(s, self.now)
             if i1 > i0:
@@ -468,7 +477,7 @@ class SimBinanceUSDM:
                     hits.append((seg, None, lp))
             if not hits:
                 return
-            seg, o, lvl = min(hits, key=lambda x: (x[0], x[1] is not None))     # earliest on the path; liquidation first on ties
+            seg, o, lvl = min(hits, key=lambda x: (x[0], x[1] is not None))     # earliest point on the path; liquidation first on exact ties
             if o is None:
                 self._liquidate(s, i, lvl)
                 continue
@@ -489,17 +498,17 @@ class SimBinanceUSDM:
 
     @staticmethod
     def _seg_hit(path, level, d, strict):
-        """Which leg of the path first reaches the level (0..2), or None."""
+        """Where along the O-H-L-C path the level is first reached: leg index (0..2) + fraction of that leg,
+        or None. The fraction lets two levels touched in the same leg be ordered correctly."""
         for k in range(3):
             a, b = path[k], path[k + 1]
             lo, hi = min(a, b), max(a, b)
             if k == 0 and ((d == 1 and (a > level if strict else a >= level)) or (d == -1 and (a < level if strict else a <= level))):
-                return 0
-            if strict:
-                if (d == 1 and hi > level) or (d == -1 and lo < level):
-                    return k
-            elif lo <= level <= hi:
-                return k
+                return 0.0
+            hit = ((d == 1 and hi > level) or (d == -1 and lo < level)) if strict else (lo <= level <= hi)
+            if hit:
+                frac = 0.0 if b == a else min(max((level - a) / (b - a), 0.0), 1.0)
+                return k + frac
         return None
 
     def _record_close(self, p: Position, px: float, t: int, reason: str):
