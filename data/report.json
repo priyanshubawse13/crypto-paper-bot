@@ -1,0 +1,240 @@
+{
+ "BTC": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 14264195
+ },
+ "ETH": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 9349168
+ },
+ "SOL": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 1255730
+ },
+ "XRP": {
+  "candles": 7353,
+  "first": "2023-07-14",
+  "usd_vol_24h": 1472561
+ },
+ "DOGE": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 142419
+ },
+ "ADA": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 1041790
+ },
+ "LINK": {
+  "candles": 10631,
+  "first": "2022-01-14",
+  "usd_vol_24h": 115527
+ },
+ "AVAX": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 10635
+ },
+ "SUI": {
+  "candles": 6736,
+  "first": "2023-10-25",
+  "usd_vol_24h": 114469
+ },
+ "LTC": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 102470
+ },
+ "BNB": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 103328
+ },
+ "DOT": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 9329
+ },
+ "ATOM": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 1144
+ },
+ "NEAR": {
+  "candles": 10595,
+  "first": "2022-01-20",
+  "usd_vol_24h": 295921
+ },
+ "UNI": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 20590
+ },
+ "AAVE": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 7054
+ },
+ "FIL": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 2592
+ },
+ "APT": {
+  "candles": 8792,
+  "first": "2022-11-16",
+  "usd_vol_24h": 6063
+ },
+ "ARB": {
+  "candles": 7827,
+  "first": "2023-04-26",
+  "usd_vol_24h": 4180
+ },
+ "OP": {
+  "candles": 9668,
+  "first": "2022-06-23",
+  "usd_vol_24h": 2784
+ },
+ "INJ": {
+  "candles": 1144,
+  "first": "2026-05-14",
+  "usd_vol_24h": 53736
+ },
+ "HBAR": {
+  "candles": 7458,
+  "first": "2023-06-27",
+  "usd_vol_24h": 16235
+ },
+ "XLM": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 25028
+ },
+ "TRX": {
+  "candles": 3610,
+  "first": "2022-04-01",
+  "usd_vol_24h": 8676
+ },
+ "BCH": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 64695
+ },
+ "SHIB": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 60571
+ },
+ "PEPE": {
+  "candles": 4294,
+  "first": "2024-12-05",
+  "usd_vol_24h": 39489
+ },
+ "ETC": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 2356
+ },
+ "ALGO": {
+  "candles": 10673,
+  "first": "2022-01-07",
+  "usd_vol_24h": 2079
+ },
+ "SEI": {
+  "candles": 2236,
+  "first": "2025-11-13",
+  "usd_vol_24h": 33
+ },
+ "TIA": {
+  "candles": 2278,
+  "first": "2025-11-06",
+  "usd_vol_24h": 541
+ },
+ "RENDER": {
+  "candles": 4923,
+  "first": "2024-08-22",
+  "usd_vol_24h": 2585
+ },
+ "FET": {
+  "candles": 9746,
+  "first": "2022-06-10",
+  "usd_vol_24h": 23843
+ },
+ "WIF": {
+  "candles": 4258,
+  "first": "2024-12-11",
+  "usd_vol_24h": 234
+ },
+ "BONK": {
+  "candles": 4426,
+  "first": "2024-11-13",
+  "usd_vol_24h": 375
+ },
+ "TAO": "not on Binance.US",
+ "ENA": {
+  "candles": 3160,
+  "first": "2025-06-12",
+  "usd_vol_24h": 1194
+ },
+ "ONDO": {
+  "candles": 2914,
+  "first": "2025-07-23",
+  "usd_vol_24h": 5935
+ },
+ "POL": {
+  "candles": 4041,
+  "first": "2025-01-16",
+  "usd_vol_24h": 11524
+ },
+ "ICP": {
+  "candles": 9680,
+  "first": "2022-06-21",
+  "usd_vol_24h": 8048
+ },
+ "VET": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 14293
+ },
+ "GRT": {
+  "candles": 10595,
+  "first": "2022-01-20",
+  "usd_vol_24h": 859
+ },
+ "TON": "not on Binance.US",
+ "CRV": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 299
+ },
+ "LDO": {
+  "candles": 9374,
+  "first": "2022-08-11",
+  "usd_vol_24h": 0
+ },
+ "STX": "not on Binance.US",
+ "JUP": {
+  "candles": 3664,
+  "first": "2025-03-20",
+  "usd_vol_24h": 1020
+ },
+ "PENGU": {
+  "candles": 4042,
+  "first": "2025-01-16",
+  "usd_vol_24h": 13619
+ },
+ "TRUMP": {
+  "candles": 4000,
+  "first": "2025-01-23",
+  "usd_vol_24h": 5520
+ },
+ "PAXG": {
+  "candles": 10709,
+  "first": "2022-01-01",
+  "usd_vol_24h": 29688
+ }
+}
