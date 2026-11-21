@@ -1,0 +1,36 @@
+name: replay-sweep
+# Runs several settings through the 2022 -> today exchange replay and saves the summaries to the sweep-results branch.
+on:
+  workflow_dispatch:
+    inputs:
+      configs:
+        description: "semicolon-separated run_sim argument sets"
+        default: "--leverage 2;--leverage 5;--leverage 10;--leverage 10 --no-lev-guard;--leverage 5 --risk 0.02"
+permissions: { contents: write }
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements.txt pyarrow
+      - uses: actions/cache/restore@v4
+        with: { path: data_fut, key: futdata-none, restore-keys: futdata- }
+      - run: python -m simex.fetch_data --start 2022-01
+      - run: mkdir -p research_data && cd research_data && python ../tools/fetch_history.py > /dev/null
+      - name: Run sweep
+        env: { CONFIGS: "${{ inputs.configs }}" }
+        run: |
+          mkdir -p sweep
+          i=0
+          IFS=';' read -ra CFG <<< "$CONFIGS"
+          for c in "${CFG[@]}"; do
+            i=$((i+1))
+            python -m simex.run_sim --data data_fut --regime research_data/data --variant v3_main $c --summary-only --out sweep/run$i
+            echo "$c" > sweep/run$i/args.txt
+          done
+      - run: |
+          git config user.name paper-bot; git config user.email paper-bot@users.noreply.github.com
+          git checkout --orphan sweep-results; git rm -rq --cached .; git add sweep; git commit -qm "sweep $(date -u +%F)"; git push -f origin sweep-results

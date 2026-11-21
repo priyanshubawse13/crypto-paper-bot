@@ -63,6 +63,8 @@ def main(argv=None):
     ap.add_argument("--leverage", type=float, default=None, help="override leverage (default 2x)")
     ap.add_argument("--risk", type=float, default=None, help="override risk per trade (default 0.01 = 1%%)")
     ap.add_argument("--max-margin-frac", type=float, default=None)
+    ap.add_argument("--no-lev-guard", action="store_true", help="use the full leverage even if liquidation comes before the stop")
+    ap.add_argument("--summary-only", action="store_true")
     a = ap.parse_args(argv)
     t0 = time.time()
     D = Path(a.data)
@@ -98,7 +100,7 @@ def main(argv=None):
         raw = regime_mod.attach(raw, reg)
         phase_note = "on (Binance.US basket)"
     ind = {p: indicators(raw[p], btc4, v) for p in pairs}
-    bot = TrendBot(ex, pairs, v, ind, a.balance)
+    bot = TrendBot(ex, pairs, v, ind, a.balance, lev_guard=not a.no_lev_guard)
 
     eq_curve, t_last_print = [], time.time()
     for t in range(start, end + 1, H4):
@@ -125,9 +127,15 @@ def main(argv=None):
         "by_reason": cp.groupby("reason").net.agg(["size", "sum"]).round(2).to_dict("index") if len(cp) else {},
         "by_side": cp.groupby("side").net.agg(["size", "sum"]).round(2).to_dict("index") if len(cp) else {},
         "by_year": cp.groupby(pd.to_datetime(cp.closed, unit="ms").dt.year).net.sum().round(2).to_dict() if len(cp) else {},
+        "leverage_setting": v.leverage, "risk_per_trade": v.risk, "lev_guard": not a.no_lev_guard,
+        "leverage_used_avg": round(float(np.mean(bot.lev_used)), 2) if bot.lev_used else None,
         "runtime_s": round(elapsed, 1),
     }
     print(json.dumps(summary, indent=1, default=str))
+    if a.summary_only:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "summary.json").write_text(json.dumps(summary, indent=1, default=str))
+        return summary
     # viewer payload: 4H candles per pair (compact), trades, equity, events
     candles, gaps = {}, {}
     for s_ in syms:

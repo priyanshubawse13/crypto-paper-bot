@@ -29,11 +29,13 @@ def to_df(rows) -> pd.DataFrame:
 
 
 class TrendBot:
-    def __init__(self, ex, pairs: list[str], v: Variant, ind: dict[str, pd.DataFrame], start_cap: float):
+    def __init__(self, ex, pairs: list[str], v: Variant, ind: dict[str, pd.DataFrame], start_cap: float, lev_guard: bool = True):
         """ind: per-pair indicator frames (index = candle open time). Only rows whose candle has CLOSED by
         ex.now are ever read (checked in _row)."""
         self.ex, self.pairs, self.v, self.ind = ex, pairs, v, ind
         self.start_cap = start_cap
+        self.lev_guard = lev_guard              # never let liquidation sit inside 1.5x the stop distance
+        self.lev_used: list[float] = []
         self.meta: dict[str, dict] = {}         # per open trade: target, stop order id, R risk
         self.losing_stops: list[int] = []
         self.pause_until = 0
@@ -114,16 +116,21 @@ class TrendBot:
             atr_m = v.s_atr_stop if (side == -1 and v.s_atr_stop) else v.atr_stop
             sp = float(np.clip(atr_m * r["atr"] / r["close"], v.min_stop, v.max_stop))
             bal = ex.fetch_balance()["USDT"]
+            lev = v.leverage
+            if self.lev_guard:
+                mmr = ex.specs[s].mmr if hasattr(ex, "specs") else 0.01
+                lev = max(1.0, min(lev, math.floor(1 / (1.5 * sp + mmr))))   # liquidation distance ~ 1/lev - mmr
+            self.lev_used.append(lev)
             notional = bal["total"] * v.risk * (v.s_risk if side == -1 else 1.0) / sp
-            margin = min(notional / v.leverage, bal["total"] * v.max_margin_frac, bal["free"] * 0.98)
+            margin = min(notional / lev, bal["total"] * v.max_margin_frac, bal["free"] * 0.98)
             price = ex.fetch_ticker(f"{s}/USDT:USDT")["last"]
-            qty = ex.amount_to_precision(f"{s}/USDT:USDT", margin * v.leverage / price)
+            qty = ex.amount_to_precision(f"{s}/USDT:USDT", margin * lev / price)
             if qty * price < ex.market(f"{s}/USDT:USDT")["limits"]["cost"]["min"]:
                 self.skipped["min_notional"] += 1
                 self._note("skip_min_size", symbol=s, notional=qty * price)
                 continue
             sym = f"{s}/USDT:USDT"
-            ex.set_leverage(v.leverage, sym)
+            ex.set_leverage(lev, sym)
             ex.set_margin_mode("isolated", sym)
             o = ex.create_order(sym, "market", "buy" if side == 1 else "sell", qty, tag="entry")
             if o["status"] != "closed":
