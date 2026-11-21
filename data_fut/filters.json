@@ -1,0 +1,17 @@
+{
+ "SOL": {
+  "tick": 0.01,
+  "step": 0.01,
+  "measured_on": "2026-11-19"
+ },
+ "BTC": {
+  "tick": 0.1,
+  "step": 0.001,
+  "measured_on": "2026-11-19"
+ },
+ "DOGE": {
+  "tick": 1e-05,
+  "step": 1.0,
+  "measured_on": "2026-11-19"
+ }
+}
