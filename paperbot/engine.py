@@ -48,12 +48,34 @@ class Variant:
     daily_loss_cap: float = 0.02
     floor_frac: float = 0.5
     description: str = ""
+    # ---- short-side settings (only affect SHORT trades) ----
+    longs: bool = True
+    short_mode: str = "breakdown"   # "breakdown" (20-day low break) | "bounce" (sell rally into falling EMA20) | "both"
+    s_btc_slope: bool = False       # BTC 50-day avg must be falling (vs 5 days ago)
+    s_ema_rsi: bool = False         # EMA20 < EMA50 and RSI(14) between 30 and 50 (momentum down, not oversold)
+    s_vol: float = 0.0              # breakdown candle volume > s_vol x 20-candle avg (fake-breakdown filter)
+    s_wick: float = 0.0             # breakdown candle lower wick <= s_wick x candle range (no buyers defending support)
+    s_body: float = 0.0             # breakdown candle closes below support by >= s_body x ATR (real close below support)
+    s_squeeze: float = 0.0          # skip if close is > s_squeeze x ATR below EMA20 (too stretched, squeeze risk)
+    s_r_mult: float = 0.0           # short take-profit in R (0 = same as longs)
+    s_be: float = 0.0               # move short stop to break-even after +s_be R (0 = off)
+    s_time: int = 0                 # close short after N candles if it is not at least +0.5R (0 = off)
+    s_risk: float = 1.0             # short risk multiplier (0.5 = half size)
+    s_atr_stop: float = 0.0         # short stop ATR multiple (0 = same as longs)
+    s_rsi_lo: float = 30.0          # RSI band used by s_ema_rsi
+    s_rsi_hi: float = 50.0
+    s_buyzone: bool = False         # skip breakdown if 15m shows buyers stepping in during the candle's last hour
 
 
-def indicators(df: pd.DataFrame, btc: pd.DataFrame, vol_mult: float) -> pd.DataFrame:
+def indicators(df: pd.DataFrame, btc: pd.DataFrame, v) -> pd.DataFrame:
+    if not isinstance(v, Variant):          # legacy call: indicators(df, btc, vol_mult)
+        v = Variant("x", vol_mult=float(v))
     df = df.copy()
     df["sma300"] = ta.SMA(df, timeperiod=300)
     df["atr"] = ta.ATR(df, timeperiod=14)
+    df["ema20"] = ta.EMA(df, timeperiod=20)
+    df["ema50"] = ta.EMA(df, timeperiod=50)
+    df["rsi"] = ta.RSI(df, timeperiod=14)
     df["hh120"] = df["high"].rolling(120).max().shift(1)
     df["ll120"] = df["low"].rolling(120).min().shift(1)
     df["vol_avg"] = df["volume"].rolling(20).mean()
@@ -61,11 +83,36 @@ def indicators(df: pd.DataFrame, btc: pd.DataFrame, vol_mult: float) -> pd.DataF
     bsma = ta.SMA(btc, timeperiod=300)
     b["btc_up"] = (b["close"] > bsma).astype(int)
     b["btc_down"] = (b["close"] < bsma).astype(int)
-    df = df.merge(b[["date", "btc_up", "btc_down"]], on="date", how="left")
-    df[["btc_up", "btc_down"]] = df[["btc_up", "btc_down"]].fillna(0)
-    vol_ok = (df["volume"] > df["vol_avg"] * vol_mult) if vol_mult > 0 else (df["volume"] > 0)
-    df["enter_long"] = ((df["close"] > df["sma300"]) & (df["btc_up"] == 1) & (df["close"] > df["hh120"]) & vol_ok).fillna(False)
-    df["enter_short"] = ((df["close"] < df["sma300"]) & (df["btc_down"] == 1) & (df["close"] < df["ll120"]) & vol_ok).fillna(False)
+    b["btc_falling"] = (bsma < bsma.shift(30)).astype(int)
+    df = df.merge(b[["date", "btc_up", "btc_down", "btc_falling"]], on="date", how="left")
+    df[["btc_up", "btc_down", "btc_falling"]] = df[["btc_up", "btc_down", "btc_falling"]].fillna(0)
+    vol_ok = (df["volume"] > df["vol_avg"] * v.vol_mult) if v.vol_mult > 0 else (df["volume"] > 0)
+    df["enter_long"] = (v.longs & (df["close"] > df["sma300"]) & (df["btc_up"] == 1) & (df["close"] > df["hh120"]) & vol_ok).fillna(False)
+
+    rng = (df["high"] - df["low"]).replace(0, np.nan)
+    down = (df["close"] < df["sma300"]) & (df["btc_down"] == 1)
+    if v.s_btc_slope:
+        down &= df["btc_falling"] == 1
+    if v.s_ema_rsi:
+        down &= (df["ema20"] < df["ema50"]) & (df["rsi"] < v.s_rsi_hi) & (df["rsi"] > v.s_rsi_lo)
+    if v.s_squeeze > 0:
+        down &= (df["ema20"] - df["close"]) <= v.s_squeeze * df["atr"]
+    brk = df["close"] < df["ll120"]
+    if v.vol_mult > 0:
+        brk &= vol_ok
+    if v.s_vol > 0:
+        brk &= df["volume"] > df["vol_avg"] * v.s_vol
+    if v.s_wick > 0:
+        brk &= ((df["close"].where(df["close"] < df["open"], df["open"]) - df["low"]) / rng) <= v.s_wick
+    if v.s_buyzone and "buyzone" in df:
+        brk &= ~df["buyzone"].fillna(False).astype(bool)
+    if v.s_body > 0:
+        brk &= (df["ll120"] - df["close"]) >= v.s_body * df["atr"]
+    # bounce: rally tags the falling EMA20 (resistance) and is rejected with a red candle closing back below it
+    bounce = ((df["high"] >= df["ema20"]) & (df["close"] < df["ema20"]) & (df["close"] < df["open"])
+              & (df["ema20"] < df["ema50"]) & (df["rsi"] < 55))
+    sig = brk if v.short_mode == "breakdown" else bounce if v.short_mode == "bounce" else (brk | bounce)
+    df["enter_short"] = (down & sig).fillna(False) if v.shorts else False
     return df.set_index("date")
 
 
@@ -122,7 +169,8 @@ def _fill(st, v, pair, price, when):
     st["open"][pair] = {
         "side": side, "entry": round(price, 8), "qty": notional / price, "margin": margin,
         "entry_fee": entry_fee, "sp": sp,
-        "stop": round(price * (1 - side * sp), 8), "target": round(price * (1 + side * v.r_mult * sp), 8),
+        "stop": round(price * (1 - side * sp), 8),
+        "target": round(price * (1 + side * ((v.s_r_mult or v.r_mult) if side == -1 else v.r_mult) * sp), 8),
         "opened": _ts(when), "signal": p["signal"], "mfe_R": 0.0, "mae_R": 0.0, "bars": 0,
     }
 
@@ -149,6 +197,9 @@ def step(st: dict, v: Variant, frames: dict, pairs: list, t: pd.Timestamp):
         hit_stop = row["low"] <= tr["stop"] if s == 1 else row["high"] >= tr["stop"]
         hit_tp = row["close"] >= tr["target"] if s == 1 else row["close"] <= tr["target"]
         trend_over = row["close"] < row["sma300"] if s == 1 else row["close"] > row["sma300"]
+        if s == -1 and v.s_be > 0 and tr["mfe_R"] >= v.s_be and tr["stop"] > e:
+            tr["stop"] = round(e * (1 - 2 * v.fee), 8)      # break-even (covers fees)
+        timed_out = s == -1 and v.s_time > 0 and tr["bars"] >= v.s_time and (e - row["close"]) / e < 0.5 * sp
         if hit_stop:
             price = min(tr["stop"], float(row["open"])) if s == 1 else max(tr["stop"], float(row["open"]))
             _close_trade(st, v, pair, price, candle_close, "stop_loss")
@@ -156,6 +207,8 @@ def step(st: dict, v: Variant, frames: dict, pairs: list, t: pd.Timestamp):
             _close_trade(st, v, pair, float(row["close"]), candle_close, "take_profit")
         elif trend_over:
             _close_trade(st, v, pair, float(row["close"]), candle_close, "trend_exit")
+        elif timed_out:
+            _close_trade(st, v, pair, float(row["close"]), candle_close, "time_exit")
 
     recent = [x for x in st["sl_times"] if pd.Timestamp(x) > candle_close - 6 * CANDLE]
     st["sl_times"] = recent
@@ -180,8 +233,9 @@ def step(st: dict, v: Variant, frames: dict, pairs: list, t: pd.Timestamp):
             side = 1 if bool(row["enter_long"]) else (-1 if v.shorts and bool(row["enter_short"]) else 0)
             if side == 0 or math.isnan(row["atr"]):
                 continue
-            sp = float(np.clip(v.atr_stop * row["atr"] / row["close"], v.min_stop, v.max_stop))
-            notional = eq * v.risk / sp
+            atr_m = v.s_atr_stop if (side == -1 and v.s_atr_stop) else v.atr_stop
+            sp = float(np.clip(atr_m * row["atr"] / row["close"], v.min_stop, v.max_stop))
+            notional = eq * v.risk * (v.s_risk if side == -1 else 1.0) / sp
             reserved = sum(p["margin"] for p in st["pending"].values())
             margin = min(notional / v.leverage, eq * v.max_margin_frac, st["cash"] - reserved)
             if margin * v.leverage < 5:
@@ -197,7 +251,7 @@ def run(st: dict, v: Variant, raw: dict, btc: pd.DataFrame, pairs: list,
     """Advance the state through every closed candle not yet processed.
     raw frames may include the still-forming candle; it is only used to fill pending entries at its open
     and as the current price."""
-    frames = {p: indicators(raw[p], btc, v.vol_mult) for p in pairs}
+    frames = {p: indicators(raw[p], btc, v) for p in pairs}
     now = now or pd.Timestamp.now(tz="UTC")
     all_t = sorted({t for f in frames.values() for t in f.index})
     closed_t = [t for t in all_t if t + CANDLE <= now]

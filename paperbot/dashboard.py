@@ -8,8 +8,8 @@ import pandas as pd
 
 from .engine import CANDLE, indicators, mark_to_market
 
-COLORS = {"ls_base": "#2563eb", "ls_vol13": "#d97706", "ls_vol15": "#7c3aed"}
-BREAKEVEN_WR = 1 / (1 + 1.5)  # 1.5R target -> 40% win rate breaks even
+COLORS = {"v2_main": "#2563eb", "v1_old": "#d97706", "longs_only": "#7c3aed"}
+BREAKEVEN_WR = 1 / (1 + 1.5)  # 1.5R long target -> 40% win rate breaks even (shorts use 1R -> 50%)
 BACKTEST = {"win_rate": 0.40, "avg_R": 0.10, "per_year": 120}
 
 
@@ -54,8 +54,11 @@ def diagnostics(st: dict) -> list[tuple[str, str]]:
     if early:
         out.append(("info", f"Only {n} closed trade{'s' if n != 1 else ''} so far. Below ~20 trades these numbers are mostly noise; treat them as early signals, not conclusions."))
     wr = (c.pnl > 0).mean()
-    lvl = "good" if wr >= BREAKEVEN_WR + 0.05 else ("warn" if wr >= BREAKEVEN_WR - 0.03 else "bad")
-    out.append((lvl, f"Win rate {wr:.0%} vs {BREAKEVEN_WR:.0%} needed to break even with a 1.5R target (backtest: {BACKTEST['win_rate']:.0%})."))
+    w, l = c[c.pnl > 0].R.mean(), c[c.pnl <= 0].R.mean()
+    be = (-l / (w - l)) if (len(c[c.pnl > 0]) and len(c[c.pnl <= 0]) and w - l > 0) else BREAKEVEN_WR
+    lvl = "good" if wr >= be + 0.05 else ("warn" if wr >= be - 0.03 else "bad")
+    out.append((lvl, f"Win rate {wr:.0%} vs {be:.0%} needed to break even at the current average win ({w if w == w else 0:+.2f}R) "
+                     f"and loss ({l if l == l else 0:+.2f}R). Backtest: about 40%."))
     losers = c[c.reason == "stop_loss"]
     if len(losers):
         gave_back = losers.hit_1R.mean()
@@ -72,7 +75,7 @@ def diagnostics(st: dict) -> list[tuple[str, str]]:
     if len(tp) >= 3:
         run_on = (tp.mfe_R >= 2.5).mean()
         if run_on >= 0.3:
-            out.append(("warn", f"{run_on:.0%} of take-profit trades kept running past +2.5R. The 1.5R target may be leaving money on the table."))
+            out.append(("warn", f"{run_on:.0%} of take-profit trades kept running past +2.5R. The take-profit target may be leaving money on the table."))
     slip = losers.R.mean() if len(losers) else None
     if slip is not None and slip < -1.15:
         out.append(("warn", f"Average stop-out costs {slip:.2f}R instead of about -1R: fees and gaps through the stop are eating into results."))
@@ -149,7 +152,7 @@ def build(states: dict, variants, raw: dict, btc: pd.DataFrame, pairs: list, now
     mk_rows, ups, downs = [], 0, 0
     btc_up = None
     for p in pairs:
-        f = indicators(raw[p], btc, 0.0)
+        f = indicators(raw[p], btc, variants[0])
         f = f[f.index + CANDLE <= now]
         if f.empty:
             continue
@@ -247,7 +250,7 @@ table{{border-collapse:collapse;width:100%;font-size:13px}} th,td{{padding:8px 1
 footer{{margin-top:36px;color:var(--mut);font-size:13px}}
 </style></head><body><main>
 <h1>Crypto paper-trading bot</h1>
-<div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100</div>
+<div class="muted">Paper money only · Binance.US 4H candles · longs and shorts (futures-style, 2x max) · each version started with $100 · v2_main is the strategy, the other two are for comparison</div>
 <div class="banner">
   <div><span>Last update</span><b>{chi(now)}</b></div>
   <div><span>Next update</span><b>~{chi(nxt)}</b></div>
@@ -265,9 +268,11 @@ footer{{margin-top:36px;color:var(--mut);font-size:13px}}
 {table(["Version","Coin","Side","Opened","Closed","Entry","Exit","P/L","R","Best / worst","Exit"], closed_rows, "No closed trades yet.")}
 <h2>Breakdown</h2>{''.join(breakdown) or '<p class="muted">Appears after the first closed trade.</p>'}
 <h2>Market check (last closed 4H candle)</h2>
-<p class="muted small">Long needs: coin above 50-day avg, BTC above its 50-day avg, close above the 20-day high. Short is the mirror image.</p>
+<p class="muted small">Signals shown for v2_main. Long: coin and BTC above their 50-day avg, close above the 20-day high.
+Short: coin and BTC below their 50-day avg, close below the 20-day low, EMA20 below EMA50, RSI between 20 and 50, and price not more than 3 ATR below EMA20.</p>
 {table(["Coin","vs 50-day avg","Price","To 20-day high","To 20-day low","Signal"], mk_rows)}
-<footer>Rules: 20-day breakout/breakdown in the direction of the 50-day trend (coin and BTC); stop 2.5× ATR; take profit at 1.5× the stop distance;
+<footer>Rules (v2_main): 20-day breakout/breakdown in the direction of the 50-day trend (coin and BTC); shorts also need EMA20 &lt; EMA50, RSI 20-50 and price not overstretched;
+stop 2.5× ATR; take profit at 1.5× the stop distance for longs, 1× for shorts;
 exit if price closes back across the 50-day average; 1% risk per trade, max 3 open; 12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
 Not modelled: funding fees and the funding-rate filter of the real futures bot. Times in Chicago time.</footer>
 </main></body></html>"""

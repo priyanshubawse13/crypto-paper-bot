@@ -21,10 +21,12 @@ from .engine import Variant, mark_to_market, new_state, run
 
 ROOT = Path(__file__).resolve().parent.parent
 PAIRS = ["SOL", "XRP", "DOGE", "ADA", "LINK", "AVAX", "SUI", "LTC"]
+MAIN_SHORT = dict(s_ema_rsi=True, s_rsi_lo=20, s_rsi_hi=50, s_squeeze=3.0, s_r_mult=1.0)
 VARIANTS = [
-    Variant("ls_base", description="Main strategy: long breakouts in uptrends, short breakdowns in downtrends"),
-    Variant("ls_vol13", vol_mult=1.3, description="Same + breakout candle volume > 1.3x average"),
-    Variant("ls_vol15", vol_mult=1.5, description="Same + breakout candle volume > 1.5x average"),
+    Variant("v2_main", **MAIN_SHORT,
+            description="NEW: longs unchanged; shorts only when EMA20<EMA50, RSI 20-50, not stretched >3 ATR below EMA20; short target 1R"),
+    Variant("v1_old", description="Old version: shorts are the exact mirror of longs (comparison)"),
+    Variant("longs_only", shorts=False, description="Longs only, sits in cash in downtrends (comparison)"),
 ]
 SITE_URL = "https://priyanshubawse13.github.io/crypto-paper-bot/"
 API = "https://api.binance.us/api/v3/klines?symbol={sym}USDT&interval=4h&limit=1000"

@@ -7,16 +7,20 @@ no real money) and paper-trades three versions of the strategy, each starting wi
 Trades both directions, futures-style (max 2x leverage): long breakouts in uptrends, short breakdowns in downtrends.
 In sideways markets it stays out on purpose.
 
-| Version | Difference |
+| Version | What it is |
 |---|---|
-| ls_base | main strategy |
-| ls_vol13 | breakout candle volume must be > 1.3x its 20-candle average |
-| ls_vol15 | breakout candle volume must be > 1.5x its 20-candle average |
+| v2_main | **the strategy**: longs unchanged; shorts with stricter rules (below) |
+| v1_old | old version, shorts are the exact mirror of longs (comparison) |
+| longs_only | no shorts, sits in cash in downtrends (comparison) |
 
-Rules (all versions):
-- Long: coin and BTC above their 50-day averages, close above the 20-day high. Short: the mirror image.
-- Stop 2.5x ATR (2-12%); take profit at 1.5x the stop distance; exit if price closes back across the 50-day average.
-- 1% risk per trade, max 3 trades; 12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
+Longs: coin and BTC above their 50-day averages, close above the 20-day high, target 1.5R.
+Shorts (v2_main): coin and BTC below their 50-day averages, close below the 20-day low, EMA20 < EMA50,
+RSI(14) between 20 and 50, price not more than 3 ATR below EMA20 (no shorting into an oversold squeeze), target 1R.
+All: stop 2.5x ATR (2-12%); exit if price closes back across the 50-day average; 1% risk per trade, max 3 trades;
+12h pause after 2 losing stops in 24h; no new trades after a 2% loss day or below $50.
+
+Backtest Feb 2023 - Oct 2026 (same engine): v2_main +94%, worst drop 14%, shorts profitable every year;
+v1_old +63%; longs_only +50%. Shorts research: research notes in the chat; 15m buy-zone filter and sell-the-bounce entries were tested and rejected.
 
 Not modelled: funding fees (real futures pay/receive these every 8h).
 
