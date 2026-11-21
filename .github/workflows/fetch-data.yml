@@ -1,0 +1,19 @@
+name: fetch-research-data
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: python tools/fetch_history.py
+      - name: Push to the research-data branch (keeps main clean)
+        run: |
+          git config user.name "paper-bot"; git config user.email "paper-bot@users.noreply.github.com"
+          git checkout --orphan research-data
+          git rm -rq --cached . ; git add data
+          git commit -qm "research data $(date -u +%F)"
+          git push -f origin research-data
