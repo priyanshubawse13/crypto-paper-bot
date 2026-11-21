@@ -1,0 +1,60 @@
+{
+ "variant": "v3_main",
+ "start": "2022-01-01",
+ "end": "2026-11-21T00:00:00+00:00",
+ "rotation": "on (Binance.US basket)",
+ "start_balance": 100.0,
+ "final_wallet": 244.78,
+ "final_equity": 244.78,
+ "trades": 283,
+ "win_rate": 0.481,
+ "profit_factor": 1.63,
+ "max_drawdown_pct": 16.6,
+ "fees": 8.55,
+ "gst_on_fees": 1.54,
+ "funding_net": -4.1,
+ "slippage_cost": 2.78,
+ "liquidations": 20,
+ "rejected_orders": 0,
+ "skipped_min_size": 16,
+ "by_reason": {
+  "liquidation": {
+   "size": 20,
+   "sum": -30.7
+  },
+  "stop": {
+   "size": 100,
+   "sum": -176.33
+  },
+  "take_profit": {
+   "size": 136,
+   "sum": 375.1
+  },
+  "trend_exit": {
+   "size": 27,
+   "sum": -23.29
+  }
+ },
+ "by_side": {
+  "long": {
+   "size": 238,
+   "sum": 104.58
+  },
+  "short": {
+   "size": 45,
+   "sum": 40.19
+  }
+ },
+ "by_year": {
+  "2022": 15.74,
+  "2023": 63.0,
+  "2024": -1.54,
+  "2025": 38.57,
+  "2026": 29.02
+ },
+ "leverage_setting": 10.0,
+ "risk_per_trade": 0.01,
+ "lev_guard": false,
+ "leverage_used_avg": 10.0,
+ "runtime_s": 19.6
+}
