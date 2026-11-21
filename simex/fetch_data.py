@@ -124,6 +124,16 @@ def main(argv=None):
             new = fetch_kind(sym, kind, need_m, days)
             df = pd.concat([old, new]).drop_duplicates("t").sort_values("t").reset_index(drop=True) if len(new) else old
             if len(df):
+                # fill holes (days missing from a monthly archive) from the daily archives
+                have_days = set(pd.to_datetime(df["t"], unit="ms").dt.strftime("%Y-%m-%d"))
+                span = pd.date_range(pd.to_datetime(df["t"].iloc[0], unit="ms").normalize(),
+                                     pd.to_datetime(df["t"].iloc[-1], unit="ms").normalize(), freq="D").strftime("%Y-%m-%d")
+                missing = [d for d in span if d not in have_days]
+                if missing:
+                    extra = fetch_kind(sym, kind, [], missing)
+                    if len(extra):
+                        df = pd.concat([df, extra]).drop_duplicates("t").sort_values("t").reset_index(drop=True)
+                    print(f"  {sym} {name}: {len(missing)} missing days, recovered {len(extra) // 1440 if len(extra) else 0} from daily files", flush=True)
                 df.to_parquet(f, compression="zstd", index=False)
         fu = fetch_funding(sym, months)
         if len(fu):

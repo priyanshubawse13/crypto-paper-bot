@@ -24,6 +24,7 @@ table{border-collapse:collapse;width:100%;font-size:12px}td,th{padding:5px 8px;b
 </style></head><body><main>
 <h1>Exchange replay</h1>
 <div class="mut" id="sub">Loading…</div>
+<div class="small" style="margin-top:4px"><a href="../">← live dashboard</a> · compare: <a href="./">v3_main</a> / <a href="no-rotation/">v3 without rotation</a></div>
 <div class="cards" id="cards"></div>
 <div class="player">
   <div class="panel">
@@ -147,7 +148,7 @@ function draw(){
   e.strokeStyle=css("--acc");e.lineWidth=1.5;e.beginPath();eq.forEach((v,i)=>i?e.lineTo(EX(i),EY(v)):e.moveTo(EX(i),EY(v)));e.stroke();
   e.strokeStyle=css("--mut");e.setLineDash([4,4]);e.beginPath();e.moveTo(0,EY(R.summary.start_balance));e.lineTo(W2,EY(R.summary.start_balance));e.stroke();e.setLineDash([]);
   e.strokeStyle=css("--ink");e.beginPath();e.moveTo(EX(idx),0);e.lineTo(EX(idx),H2);e.stroke();
-  e.fillStyle=css("--mut");e.font="11px sans-serif";e.fillText(fmt(mx/1.02,0),4,12);e.fillText(new Date(tmin).getFullYear(),4,H2-4);e.fillText(new Date(tmax).getFullYear(),W2-36,H2-4);
+  e.fillStyle=css("--mut");e.font="11px sans-serif";e.fillText(fmt(mx/1.02,0),4,12);e.fillText(new Date(tmin+864e5).getFullYear(),4,H2-4);e.fillText(new Date(tmax).getFullYear(),W2-36,H2-4);
   // account + positions + log
   const cur=R.equity[idx]; $("acct").innerHTML=`Wallet <b>${fmt(cur[1])}</b> · Equity <b>${fmt(cur[2])}</b> · ${((cur[2]/R.summary.start_balance-1)*100).toFixed(1)}%`;
   const op=R.trades.filter(t=>t.opened<=now && t.closed>now);

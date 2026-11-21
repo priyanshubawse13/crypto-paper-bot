@@ -122,12 +122,22 @@ def main(argv=None):
     }
     print(json.dumps(summary, indent=1, default=str))
     # viewer payload: 4H candles per pair (compact), trades, equity, events
-    candles = {}
+    candles, gaps = {}, {}
+    for s_ in syms:
+        t = bars[s_].t
+        d = np.diff(t)
+        big = np.where(d > 3600_000)[0]
+        if len(big):
+            gaps[s_] = [[pd.Timestamp(int(t[i]), unit="ms").isoformat(), round(float(d[i]) / 3600_000, 1)] for i in big[:20]]
+    summary["data_gaps_over_1h"] = gaps
+    if gaps:
+        print("data gaps (start, hours):", json.dumps(gaps))
     for p in pairs:
-        h = ex._h4[p]
-        h = h[(h.t >= start - 60 * H4) & (h.t <= end)]
-        candles[p] = {"t0": int(h.t.iloc[0]), "o": h.o.round(6).tolist(), "h": h.h.round(6).tolist(),
-                      "l": h.l.round(6).tolist(), "c": h.c.round(6).tolist(),
+        h = ex._h4[p].set_index("t")
+        grid = np.arange(max(int(h.index[0]), start - 60 * H4), end + 1, H4)
+        h = h.reindex(grid).rename_axis("t").reset_index()             # contiguous 4H grid; gaps become null
+        nn = lambda x: [None if v != v else v for v in x.round(6).tolist()]
+        candles[p] = {"t0": int(h.t.iloc[0]), "o": nn(h.o), "h": nn(h.h), "l": nn(h.l), "c": nn(h.c),
                       "sma": ind[p]["sma300"].reindex(pd.to_datetime(h.t, unit="ms", utc=True)).round(6).fillna(0).tolist()}
     payload = {"summary": summary, "candles": candles, "equity": eq_curve[::1],
                "trades": [{k: (round(x, 6) if isinstance(x, float) else x) for k, x in r.items()} for r in ex.closed_positions],
