@@ -60,6 +60,9 @@ def main(argv=None):
     ap.add_argument("--pairs", default=",".join(PAIRS12))
     ap.add_argument("--balance", type=float, default=100.0)
     ap.add_argument("--out", default="site/replay")
+    ap.add_argument("--leverage", type=float, default=None, help="override leverage (default 2x)")
+    ap.add_argument("--risk", type=float, default=None, help="override risk per trade (default 0.01 = 1%%)")
+    ap.add_argument("--max-margin-frac", type=float, default=None)
     a = ap.parse_args(argv)
     t0 = time.time()
     D = Path(a.data)
@@ -71,7 +74,7 @@ def main(argv=None):
     for s in syms:
         bars[s] = make_bars(pd.read_parquet(D / f"{s}_1m.parquet"), rd(D / f"{s}_mark1m.parquet"), rd(D / f"{s}_funding.parquet"))
         f = filters.get(s, {})
-        specs[s] = SymbolSpec(tick=f.get("tick", 1e-4), step=f.get("step", 1e-3), mmr=MMR.get(s, 0.01),
+        specs[s] = SymbolSpec(tick=f.get("tick", 1e-4), step=f.get("step", 1e-3), mmr=MMR.get(s, 0.01), max_leverage=125 if s == "BTC" else 75,
                               half_spread_bps=SPREAD_BPS.get(s, 2.0))
     start = int(pd.Timestamp(a.start, tz="UTC").value // 10**6)
     start = (start + H4 - 1) // H4 * H4
@@ -80,7 +83,11 @@ def main(argv=None):
     ex = SimBinanceUSDM(bars, specs, start, balance=a.balance, fees=Fees())
     print(f"data loaded in {time.time() - t0:.0f}s: {', '.join(f'{s}:{len(bars[s].t)}' for s in syms)}", flush=True)
 
+    import dataclasses
     v = VARIANTS[a.variant]
+    over = {k: x for k, x in (("leverage", a.leverage), ("risk", a.risk), ("max_margin_frac", a.max_margin_frac)) if x is not None}
+    if over:
+        v = dataclasses.replace(v, **over)
     btc4 = h4_frame(ex, "BTC")
     raw = {p: h4_frame(ex, p) for p in pairs}
     R = Path(a.regime)
