@@ -24,6 +24,7 @@ table{border-collapse:collapse;width:100%;font-size:12px}td,th{padding:5px 8px;b
 </style></head><body><main>
 <h1>Exchange replay</h1>
 <div class="mut" id="sub">Loading…</div>
+<div class="small" style="margin-top:4px"><a href="../">← live dashboard</a> · compare: <a href="./">v3_main</a> / <a href="no-rotation/">v3 without rotation</a></div>
 <div class="cards" id="cards"></div>
 <div class="player">
   <div class="panel">
@@ -121,14 +122,14 @@ function draw(){
   const [g,W,Hh]=sizeCanvas($("chart")); g.clearRect(0,0,W,Hh);
   const N=Math.min(160,Math.max(20,iNow+1)), i0=Math.max(0,iNow-N+1), cw=(W-70)/N;
   const live=R.trades.filter(t=>t.symbol===coin && t.opened<=now+H4 && t.closed>now);
-  let lo=Infinity,hi=-Infinity; for(let i=i0;i<=iNow;i++){lo=Math.min(lo,C.l[i]);hi=Math.max(hi,C.h[i]); if(C.sma[i]){lo=Math.min(lo,C.sma[i]);hi=Math.max(hi,C.sma[i])}}
+  let lo=Infinity,hi=-Infinity; for(let i=i0;i<=iNow;i++){if(C.l[i]==null)continue;lo=Math.min(lo,C.l[i]);hi=Math.max(hi,C.h[i]); if(C.sma[i]){lo=Math.min(lo,C.sma[i]);hi=Math.max(hi,C.sma[i])}}
   live.forEach(t=>{[t.entry,t.stop,t.target].forEach(v=>{if(v){lo=Math.min(lo,v);hi=Math.max(hi,v)}})});
   if(!isFinite(lo)){return}
   const pad=(hi-lo)*0.05; lo-=pad; hi+=pad;
   const X=i=>(i-i0)*cw+cw/2, Y=v=>10+(1-(v-lo)/(hi-lo))*(Hh-30);
   g.font="11px sans-serif"; g.fillStyle=css("--mut"); g.strokeStyle=css("--line");
   for(let k=0;k<=4;k++){const v=lo+(hi-lo)*k/4;g.beginPath();g.moveTo(0,Y(v));g.lineTo(W-70,Y(v));g.stroke();g.fillText(fp(v),W-66,Y(v)+4)}
-  for(let i=i0;i<=iNow;i++){const up=C.c[i]>=C.o[i];g.strokeStyle=g.fillStyle=up?css("--pos"):css("--neg");
+  for(let i=i0;i<=iNow;i++){if(C.o[i]==null)continue;const up=C.c[i]>=C.o[i];g.strokeStyle=g.fillStyle=up?css("--pos"):css("--neg");
     g.beginPath();g.moveTo(X(i),Y(C.h[i]));g.lineTo(X(i),Y(C.l[i]));g.stroke();
     const y1=Y(Math.max(C.o[i],C.c[i])),y2=Y(Math.min(C.o[i],C.c[i]));g.fillRect(X(i)-cw*0.35,y1,Math.max(1,cw*0.7),Math.max(1,y2-y1))}
   g.strokeStyle="#9ca3af";g.lineWidth=1.5;g.beginPath();let st=false;for(let i=i0;i<=iNow;i++){if(!C.sma[i])continue;st?g.lineTo(X(i),Y(C.sma[i])):g.moveTo(X(i),Y(C.sma[i]));st=true}g.stroke();g.lineWidth=1;
@@ -147,7 +148,7 @@ function draw(){
   e.strokeStyle=css("--acc");e.lineWidth=1.5;e.beginPath();eq.forEach((v,i)=>i?e.lineTo(EX(i),EY(v)):e.moveTo(EX(i),EY(v)));e.stroke();
   e.strokeStyle=css("--mut");e.setLineDash([4,4]);e.beginPath();e.moveTo(0,EY(R.summary.start_balance));e.lineTo(W2,EY(R.summary.start_balance));e.stroke();e.setLineDash([]);
   e.strokeStyle=css("--ink");e.beginPath();e.moveTo(EX(idx),0);e.lineTo(EX(idx),H2);e.stroke();
-  e.fillStyle=css("--mut");e.font="11px sans-serif";e.fillText(fmt(mx/1.02,0),4,12);e.fillText(new Date(tmin).getFullYear(),4,H2-4);e.fillText(new Date(tmax).getFullYear(),W2-36,H2-4);
+  e.fillStyle=css("--mut");e.font="11px sans-serif";e.fillText(fmt(mx/1.02,0),4,12);e.fillText(new Date(tmin+864e5).getFullYear(),4,H2-4);e.fillText(new Date(tmax).getFullYear(),W2-36,H2-4);
   // account + positions + log
   const cur=R.equity[idx]; $("acct").innerHTML=`Wallet <b>${fmt(cur[1])}</b> · Equity <b>${fmt(cur[2])}</b> · ${((cur[2]/R.summary.start_balance-1)*100).toFixed(1)}%`;
   const op=R.trades.filter(t=>t.opened<=now && t.closed>now);
