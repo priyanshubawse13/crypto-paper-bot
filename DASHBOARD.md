@@ -2,7 +2,7 @@
 
 **Full dashboard: https://priyanshubawse13.github.io/crypto-paper-bot/**
 
-Last run: Nov 26 07:48 AM Chicago. Paper money only, longs + shorts, $100 start each.
+Last run: Nov 26 06:31 PM Chicago. Paper money only, longs + shorts, $100 start each.
 
 | Version | Equity | Trades | Open |
 |---|---|---|---|
